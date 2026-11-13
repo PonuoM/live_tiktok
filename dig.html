@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="th"><head><meta charset="utf-8">
+<title>ขุดสมบัติ LIVE</title>
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@500;700&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#000;height:100%;display:flex;align-items:center;justify-content:center;overflow:hidden}
+canvas{height:100vh;aspect-ratio:9/16}
+</style></head><body>
+<canvas id="c" width="1080" height="1920"></canvas>
+<script>
+// ===== ขุดสมบัติ: คนดูช่วยกันขุดลงใต้ดิน ไม่มีแพ้ เป้าคือลึกกว่าสถิติเดิม =====
+// กดหัวใจ = ขุด  พิมพ์ 1-9 = เลือกช่อง  บล็อกที่ใครขุดแตก สมบัติในนั้นเป็นของคนนั้น  ของขวัญ = ระเบิดหลายชั้น
+// ?demo=1 คนดูจำลอง  ?speed=3 เร่งเวลา  ?safe=1 ระบายส่วนที่ UI ของ TikTok บัง  ?depth=60 เริ่มที่ความลึกนั้น (ไว้ตรวจฉาก)
+const Q=new URLSearchParams(location.search),DEMO=Q.has('demo'),SPEED=+Q.get('speed')||1,SHOWSAFE=Q.has('safe');
+const cv=document.getElementById('c'),g=cv.getContext('2d');
+const W=1080,H=1920,FONT='Kanit, Tahoma, sans-serif';
+const rnd=(a,b)=>a+Math.random()*(b-a),pick=a=>a[Math.random()*a.length|0],clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const short=(s,n=8)=>s.length>n?s.slice(0,n)+'…':s;
+const ease={out:k=>1-(1-k)*(1-k),back:k=>{const c=1.7;k-=1;return 1+k*k*((c+1)*k+c)},in:k=>k*k*k};
+let NOW=0,live={state:DEMO?'demo':'connecting'};
+// วัดจากจอมือถือจริง: แถบบนของ TikTok กิน 0-65 คอมเมนต์ล่างซ้ายกิน 1400 ลงไป
+const SAFE_T=72,SAFE_B=1390;
+const COLS=9,BS=120,FRONT_Y=820,ZLEN=20,IDLE=25;
+
+// ---------- ชั้นดิน: ทุก 20 เมตรเปลี่ยนฉาก ----------
+const ZONES=[
+ {n:'ดินร่วน',a:'#8a6440',b:'#6e4e32',c:'#a07a52',bg:'#3c2a1c',deco:'pebble'},
+ {n:'รากไม้โบราณ',a:'#6f4f35',b:'#563c28',c:'#87634a',bg:'#30221a',deco:'root'},
+ {n:'หินแกรนิต',a:'#77777d',b:'#5c5c63',c:'#93939a',bg:'#2c2c33',deco:'speck'},
+ {n:'ถ้ำคริสตัล',a:'#4f4a78',b:'#3c375e',c:'#6a64a0',bg:'#1e1b33',deco:'crystal'},
+ {n:'สุสานไดโนเสาร์',a:'#a8956c',b:'#8a7854',c:'#c2af86',bg:'#3b3222',deco:'bone'},
+ {n:'แม่น้ำลาวา',a:'#4c2a24',b:'#3a1e1a',c:'#64382e',bg:'#1e0e0b',deco:'lava'},
+ {n:'เมืองใต้ดินที่หายไป',a:'#7a6c52',b:'#5f533e',c:'#958566',bg:'#2a241a',deco:'brick'},
+ {n:'ธารน้ำแข็งลึก',a:'#7aa0b8',b:'#5d8299',c:'#a6c8dc',bg:'#1c2a35',deco:'ice'},
+ {n:'แกนโลก',a:'#5a2418',b:'#43180f',c:'#7a3420',bg:'#1a0806',deco:'core'}];
+function zoneOf(r){return Math.max(0,Math.floor(r/ZLEN))}
+function zoneInfo(z){const b=ZONES[z%ZONES.length],lap=Math.floor(z/ZONES.length);return {...b,n:lap?`${b.n} ชั้น ${lap+1}`:b.n,lap}}
+
+// ลายบล็อกพิกเซล 30x30 ขยาย 4 เท่า สุ่มไว้ 4 แบบต่อชั้น
+const TEX={};
+function mkTex(z,hard){const k=`${z%ZONES.length}${hard?'h':''}`;if(TEX[k])return TEX[k];const Z=ZONES[z%ZONES.length];TEX[k]=[];
+  for(let v=0;v<4;v++){const c=document.createElement('canvas');c.width=c.height=30;const x=c.getContext('2d');
+    x.fillStyle=hard?shade(Z.a,0.72):Z.a;x.fillRect(0,0,30,30);
+    for(let i=0;i<120;i++){x.fillStyle=Math.random()<0.5?(hard?shade(Z.b,0.7):Z.b):(hard?shade(Z.c,0.8):Z.c);x.fillRect(Math.random()*30|0,Math.random()*30|0,1+(Math.random()<0.3),1)}
+    const d=Z.deco;x.globalAlpha=1;
+    if(d==='pebble')for(let i=0;i<3;i++){const px=rnd(3,25)|0,py=rnd(3,25)|0;x.fillStyle='#b8a48a';x.fillRect(px,py,3,2);x.fillStyle='#6a5a48';x.fillRect(px,py+2,3,1)}
+    if(d==='root'){x.fillStyle='#3b2a1e';let px=rnd(0,30)|0;for(let y=0;y<30;y++){px+=Math.random()<0.3?(Math.random()<0.5?-1:1):0;x.fillRect(px,y,2,1)}}
+    if(d==='speck')for(let i=0;i<6;i++){x.fillStyle=pick(['#c8c8cf','#3a3a40','#a89a90']);x.fillRect(rnd(1,28)|0,rnd(1,28)|0,1,1)}
+    if(d==='crystal')for(let i=0;i<2;i++){const px=rnd(4,24)|0,py=rnd(8,24)|0,col=pick(['#9fe4ff','#d79cff','#8affc8']);x.fillStyle=col;x.fillRect(px,py-5,2,6);x.fillRect(px+2,py-3,2,4);x.fillStyle='#fff';x.fillRect(px,py-5,1,2)}
+    if(d==='bone'&&Math.random()<0.6){const px=rnd(4,20)|0,py=rnd(6,22)|0;x.fillStyle='#efe6cf';x.fillRect(px,py,8,2);x.fillRect(px-1,py-1,2,4);x.fillRect(px+7,py-1,2,4)}
+    if(d==='lava'){x.fillStyle='#e8602c';let py=rnd(5,25)|0;for(let px=0;px<30;px++){py+=Math.random()<0.25?(Math.random()<0.5?-1:1):0;x.fillRect(px,py,1,2)}x.fillStyle='#ffb04a';x.fillRect(rnd(3,26)|0,rnd(3,26)|0,2,1)}
+    if(d==='brick'){x.fillStyle=shade(Z.b,0.8);for(let y=0;y<30;y+=7){x.fillRect(0,y,30,1);for(let px=(y/7%2)*7;px<30;px+=14)x.fillRect(px,y,1,7)}}
+    if(d==='ice'){x.fillStyle='rgba(255,255,255,.55)';x.fillRect(rnd(3,20)|0,rnd(3,20)|0,6,1);x.fillRect(rnd(3,20)|0,rnd(3,20)|0,1,5)}
+    if(d==='core')for(let i=0;i<4;i++){x.fillStyle=pick(['#ff7a2c','#ffd04a','#e8402c']);x.fillRect(rnd(1,28)|0,rnd(1,28)|0,2,2)}
+    if(hard){x.fillStyle='rgba(220,230,240,.5)';for(let i=0;i<5;i++)x.fillRect(rnd(2,27)|0,rnd(2,27)|0,2,1)}
+    // ขอบบนสว่าง ขอบล่างมืด ให้ดูเป็นก้อน
+    x.fillStyle='rgba(255,255,255,.12)';x.fillRect(0,0,30,1);x.fillRect(0,0,1,30);x.fillStyle='rgba(0,0,0,.28)';x.fillRect(0,29,30,1);x.fillRect(29,0,1,30);
+    TEX[k].push(c)}return TEX[k]}
+// รอยร้าว 3 ระดับ
+const CRACK=[1,2,3].map(n=>{const c=document.createElement('canvas');c.width=c.height=30;const x=c.getContext('2d');x.fillStyle='rgba(15,10,8,.85)';
+  for(let k=0;k<n*2;k++){let px=15+rnd(-4,4),py=15+rnd(-4,4);const a=rnd(0,6.28);for(let s=0;s<6+n*2;s++){px+=Math.cos(a+rnd(-0.7,0.7))*1.4;py+=Math.sin(a+rnd(-0.7,0.7))*1.4;x.fillRect(px|0,py|0,1,1)}}return c});
+function shade(hex,f){const n=parseInt(hex.slice(1),16);const r=n>>16,g2=n>>8&255,b2=n&255;
+  const k=v=>Math.max(0,Math.min(255,Math.round(f<1?v*f:v+(255-v)*(f-1))));return '#'+[k(r),k(g2),k(b2)].map(v=>v.toString(16).padStart(2,'0')).join('')}
+
+// ---------- สมบัติ ----------
+const LOOT={coin:{n:'เหรียญทอง',pts:10,col:'#f0c86a'},gem:{n:'อัญมณี',pts:30,col:'#7fd8ff'},fossil:{n:'ฟอสซิล',pts:60,col:'#efe6cf'},relic:{n:'ของโบราณ',pts:100,col:'#e89a5a'},chest:{n:'หีบสมบัติ',pts:300,col:'#ffd04a'}};
+function mkIcon(rows,pal){const c=document.createElement('canvas');c.width=rows[0].length;c.height=rows.length;const x=c.getContext('2d');
+  rows.forEach((r,y)=>[...r].forEach((ch,i)=>{if(pal[ch]){x.fillStyle=pal[ch];x.fillRect(i,y,1,1)}}));return c}
+const ICON={
+ coin:mkIcon(['..oooo..','.oyyyyo.','oyYyyyyo','oyYyyyyo','oyYyyyyo','oyyyyyBo','.oyyyBo.','..oooo..'],{o:'#5a3a08',y:'#f0c86a',Y:'#fff3b0',B:'#b8862a'}),
+ gem:mkIcon(['..oooo..','.obWbbo.','obWbbbbo','oBbbbbBo','.oBbbBo.','..oBBo..','...oo...'],{o:'#103850',b:'#5ac8ff',W:'#e8faff',B:'#2a8ac0'}),
+ fossil:mkIcon(['oo....oo','owo..owo','.owwwwo.','..owwo..','.owwwwo.','owo..owo','oo....oo'],{o:'#5a4a30',w:'#efe6cf'}),
+ relic:mkIcon(['...oo...','..oyyo..','.oyRRyo.','.oyRRyo.','oyyyyyyo','oYyyyyBo','.oooooo.'],{o:'#4a2a10',y:'#e8a050',Y:'#ffd28a',B:'#a85a20',R:'#c0392b'}),
+ chest:mkIcon(['.oooooooo.','obbbbbbbbo','oBBByyBBBo','oooyYYyooo','obbbyybbbo','obbbbbbbbo','oBBBBBBBBo','.oooooooo.'],{o:'#2a1808',b:'#9a5a2a',B:'#6a3a18',y:'#f0c86a',Y:'#fff3b0'})};
+function rollLoot(r,boost){const z=zoneOf(r),ch=(0.13+Math.min(0.12,z*0.015))*(boost?3:1);if(Math.random()>ch)return null;
+  const w=[['coin',60-z*4],['gem',22+z*2],['fossil',z>=1?12+z:4],['relic',z>=2?6+z*1.5:1],['chest',2+z*0.6]];
+  let s=w.reduce((a,b)=>a+Math.max(1,b[1]),0)*Math.random();for(const [k,v] of w){s-=Math.max(1,v);if(s<=0)return k}return 'coin'}
+
+// ---------- แผนที่ใต้ดิน ----------
+const rows={};let front=+Q.get('depth')||0,camY=front*BS,goldRows=0,maxDepth=0;
+function blockHp(r){return 3+zoneOf(r)*1.6+r*0.03}
+function row(r){if(rows[r])return rows[r];const z=zoneOf(r),hardCol=Math.random()<0.18?rnd(0,COLS)|0:-1;
+  rows[r]=[...Array(COLS)].map((_,c)=>{const hard=c===hardCol,max=blockHp(r)*(hard?2.5:1);return {hp:max,max,hard,loot:rollLoot(r,r<goldRows),tex:Math.random()*4|0,hitT:-9,by:null}});return rows[r]}
+for(let r=0;r<front;r++)row(r).forEach(b=>b.hp=0);
+function rowDone(r){return row(r).every(b=>b.hp<=0)}
+function rowTop(r){return FRONT_Y+(r*BS-camY)}
+// ช่องที่ขุดต่อในคอลัมน์: บล็อกแรกที่ยังไม่แตกตั้งแต่ชั้นหน้าลงไป
+function digRow(c){let r=front;while(row(r)[c].hp<=0)r++;return r}
+
+// ---------- คนดู ----------
+let P={},fx=[],pops=[],banners=[],flyers=[],pending=[],shake=0;
+const SHIRTS=['#a85a4a','#4a6a8a','#8a7a4a','#6a4a7a','#4a7a6a','#9a6a3a','#5a5f8f','#8f4f5f'];
+const PICK=[{n:'พลั่วไม้',c:'#a07850',m:1},{n:'จอบหิน',c:'#9a9aa0',m:1.5},{n:'จอบเหล็ก',c:'#d0d4da',m:2},{n:'จอบทอง',c:'#f0c86a',m:3},{n:'จอบเพชร',c:'#7fe8f8',m:4}];
+const LV=[0,30,100,250,500];
+function lvOf(h){let l=1;LV.forEach((v,i)=>{if(h>=v)l=i+1});return l}
+function active(){return Object.values(P).filter(p=>NOW-p.last<IDLE&&!p.bot)}
+function colCount(c){return Object.values(P).filter(p=>(p.bot||NOW-p.last<IDLE)&&p.col===c).length}
+function setPic(p,url){if(!url||p.picUrl===url)return;p.picUrl=url;const im=new Image();im.referrerPolicy='no-referrer';im.src=url;p.pic=im}
+function player(name,pic){let p=P[name];
+  if(!p){let best=[...Array(COLS).keys()].sort((a,b)=>colCount(a)-colCount(b)||Math.abs(a-4)-Math.abs(b-4))[0];
+    p=P[name]={name,col:best,wc:best,x:best*BS+BS/2,last:NOW,hearts:0,lv:1,pts:0,q:0,cd:0,swing:-9,shirt:pick(SHIRTS),slot:Math.random()};
+    if(!PRESIM){announce(name);popup(`${short(name,10)} มาช่วยขุด!`,p.x,FRONT_Y-170,'#f0c86a',30)}}
+  else if(NOW-p.last>=IDLE&&!PRESIM)announce(name);
+  setPic(p,pic);p.last=NOW;return p}
+const BOT={name:'คนงานบอท',bot:true,col:4,wc:4,x:4*BS+BS/2,last:0,hearts:0,lv:1,pts:0,q:0,cd:0,swing:-9,shirt:'#6a6a5a',slot:0.5};
+
+function popup(s,x,y,col='#fff',size=34,img=null){pops.push({s,x,y,col,size,img,t:NOW})}
+function banner(s,col='#fff',sub=''){banners.push({s,col,sub,t:Math.max(NOW,...banners.map(b=>b.t+2.4))})}
+
+// ---------- ขุด ----------
+function hit(p,dmg){
+  // ช่องตัวเองขุดลึกนำหน้าไปแล้ว เดินไปช่วยช่องที่ชั้นหน้ายังไม่แตกที่ใกล้ที่สุด
+  let c=p.col;if(digRow(c)>front+1){const open=[...Array(COLS).keys()].filter(i=>row(front)[i].hp>0).sort((a,b)=>Math.abs(a-p.col)-Math.abs(b-p.col));if(open.length)c=open[0]}
+  p.wc=c;const r=digRow(c),b=row(r)[c];p.swing=NOW;
+  if(b.chestPart&&bigChest){hitChest(p,dmg);return}
+  b.hp-=dmg;b.hitT=NOW;const x=c*BS+BS/2,y=rowTop(r)+8;
+  for(let i=0;i<3;i++)fx.push({type:'chip',x:x+rnd(-30,30),y,vx:rnd(-160,160),vy:rnd(-260,-80),c:pick([ZONES[zoneOf(r)%ZONES.length].a,ZONES[zoneOf(r)%ZONES.length].c]),t:NOW,life:0.5});
+  if(Math.random()<0.4)fx.push({type:'spark',x,y,vx:rnd(-200,200),vy:rnd(-260,-60),c:'#ffe9a0',t:NOW,life:0.25});
+  sfx('wallhit',0.45);
+  if(b.hp<=0)breakBlock(r,c,p)}
+function breakBlock(r,c,p,quiet){const b=row(r)[c];if(b.broke)return;b.broke=true;b.hp=0;b.by=p?p.name:null;
+  const x=c*BS+BS/2,y=rowTop(r)+BS/2,Z=ZONES[zoneOf(r)%ZONES.length];
+  for(let i=0;i<(quiet?5:10);i++)fx.push({type:'chunk',x:x+rnd(-40,40),y:y+rnd(-40,40),vx:rnd(-260,260),vy:rnd(-420,-120),c:pick([Z.a,Z.b,Z.c]),s:rnd(8,16),t:NOW,life:0.8});
+  fx.push({type:'dust',x,y,t:NOW,life:0.5});
+  if(!quiet)sfx('reload',0.7);
+  if(b.loot)collect(b.loot,x,y,p)}
+function collect(k,x,y,p){const L=LOOT[k],mul=goldRush>NOW?2:1,pts=L.pts*mul;
+  if(p&&!p.bot){p.pts+=pts;liveTotal+=pts}
+  flyers.push({k,x,y,t:NOW,name:p&&!p.bot?p.name:null});
+  popup(`${L.n} +${pts}`,x,y-50,L.col,k==='chest'?40:30);
+  sfx(k==='chest'?'gift3':k==='relic'||k==='fossil'?'gift2':'gift1',k==='coin'?0.5:0.8);
+  if(k==='chest'){shake=Math.max(shake,14);for(let i=0;i<24;i++)fx.push({type:'spark',x,y,vx:rnd(-380,380),vy:rnd(-520,-100),c:pick(['#ffd04a','#fff3b0','#f0a040']),t:NOW,life:0.9})}}
+// ระเบิด: แตกบล็อกตามพื้นที่ สมบัติเป็นของคนส่ง
+function blast(rs,cs,p){let n=0;rs.forEach(r=>cs.forEach(c=>{const b=row(r)[c];if(b.chestPart){if(bigChest&&!p.bot&&!b.bl){b.bl=1;setTimeout(()=>b.bl=0,50);hitChest(p,blockHp(r)*3)}}else if(b.hp>0){breakBlock(r,c,p,n++>4);}}));
+  const xs=cs.map(c=>c*BS+BS/2),ys=rs.map(r=>rowTop(r)+BS/2),cx=(Math.min(...xs)+Math.max(...xs))/2,cy=(Math.min(...ys)+Math.max(...ys))/2;
+  fx.push({type:'boom',x:cx,y:cy,r:Math.max(140,(Math.max(...xs)-Math.min(...xs))*0.6),t:NOW,life:0.5});shake=Math.max(shake,18+rs.length*3);sfx('grenade')}
+
+// ---------- ความลึก สถิติ ฉากใหม่ ----------
+let record=0,recordBroken=false,liveTotal=0;
+fetch('/dig-record').then(r=>r.json()).then(d=>{record=d.best||0}).catch(()=>{});
+function saveRecord(){if(DEMO)return;fetch('/dig-record',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({best:Math.max(record,front)})}).catch(()=>{})}
+function advance(){let moved=false;while(rowDone(front)){front++;moved=true;
+    if(front%ZLEN===0){const z=zoneInfo(zoneOf(front));banner(`ถึงชั้น ${z.n}!`,'#f0c86a',`ความลึก ${front} เมตร`);sfx('levelup');zoneFlash=NOW;
+      for(let i=0;i<60;i++)fx.push({type:'conf',x:rnd(0,W),y:rnd(380,700),vx:rnd(-80,80),vy:rnd(120,300),rot:rnd(0,6),vr:rnd(-8,8),c:pick(['#f0c86a','#e5566b','#7fd8ff','#9fe08a']),w:rnd(10,16),t:NOW,life:3})}
+    if(record>0&&!recordBroken&&front>record){recordBroken=true;banner('ทำลายสถิติแล้ว!','#ffd04a',`ลึกกว่าไลฟ์ที่แล้ว (${record} เมตร)`);sfx('win');
+      for(let i=0;i<120;i++)fx.push({type:'conf',x:rnd(0,W),y:rnd(300,600),vx:rnd(-80,80),vy:rnd(120,320),rot:rnd(0,6),vr:rnd(-8,8),c:pick(['#ffd04a','#fff','#e5566b','#7fd8ff']),w:rnd(10,18),t:NOW,life:4})}}
+  if(moved&&front>maxDepth){maxDepth=front;if(front%5===0)saveRecord()}}
+let zoneFlash=-9;
+
+// ---------- เหตุการณ์สุ่ม ทุก 50-80 วิ ----------
+let evT=40,goldRush=-9,bigChest=null;
+function event(){const k=pick(['chest','gold','quake','rush']);
+  if(k==='chest'&&!bigChest){const r=front+2;row(r);const hp=blockHp(r)*14;bigChest={r,c0:3,hp,max:hp,hits:{}};[3,4,5].forEach(c=>{const b=row(r)[c];b.hp=Math.max(b.hp,0.001);b.chestPart=true});
+    banner('หีบยักษ์โผล่!','#ffd04a','ช่วยกันขุด แบ่งสมบัติตามแรงที่ช่วย');sfx('honor')}
+  else if(k==='gold'){goldRows=front+4;for(let r=front;r<front+4;r++)row(r).forEach(b=>{if(b.hp>0&&!b.loot&&Math.random()<0.45)b.loot=pick(['coin','coin','gem','relic'])});banner('เจอสายแร่ทอง!','#f0c86a','4 ชั้นข้างหน้าเต็มไปด้วยสมบัติ');sfx('gift2')}
+  else if(k==='quake'){for(let r=front;r<front+3;r++)row(r).forEach(b=>{if(b.hp>0&&!b.chestPart)b.hp*=0.4});shake=40;banner('แผ่นดินไหว!','#e09a4a','หินร้าวไปครึ่งหนึ่ง ขุดง่ายขึ้น');sfx('tank',0.8);
+    for(let i=0;i<30;i++)fx.push({type:'chunk',x:rnd(0,W),y:rnd(400,700),vx:rnd(-60,60),vy:rnd(0,200),c:'#6a5a48',s:rnd(6,14),t:NOW,life:1.2})}
+  else{goldRush=NOW+20;banner('สมบัติ x2 !','#9fe08a','20 วินาที ทุกชิ้นได้แต้มสองเท่า');sfx('gift2')}}
+function hitChest(p,dmg){const bc=bigChest;bc.hp-=dmg;bc.hits[p.name]=(bc.hits[p.name]||0)+dmg;p.swing=NOW;bc.hitT=NOW;sfx('wallhit',0.5);
+  const x=4*BS+BS/2,y=rowTop(bc.r)+8;for(let i=0;i<3;i++)fx.push({type:'spark',x:x+rnd(-140,140),y,vx:rnd(-200,200),vy:rnd(-260,-60),c:'#ffd04a',t:NOW,life:0.3});
+  if(bc.hp<=0){const total=Object.values(bc.hits).reduce((a,b)=>a+b,0),pot=1200*(goldRush>NOW?2:1);
+    Object.entries(bc.hits).forEach(([n,v])=>{const q=P[n];if(q&&!q.bot){const s=Math.max(10,Math.round(pot*v/total));q.pts+=s;liveTotal+=s;popup(`${short(n,8)} +${s}`,q.x,FRONT_Y-120-rnd(0,60),'#ffd04a',28)}});
+    [3,4,5].forEach(c=>{const b=row(bc.r)[c];b.chestPart=false;b.loot=null;breakBlock(bc.r,c,null,true)});
+    const x2=4*BS+BS/2,y2=rowTop(bc.r)+BS/2;fx.push({type:'boom',x:x2,y:y2,r:260,t:NOW,life:0.6});for(let i=0;i<50;i++)fx.push({type:'spark',x:x2,y:y2,vx:rnd(-500,500),vy:rnd(-700,-100),c:pick(['#ffd04a','#fff3b0','#7fd8ff']),t:NOW,life:1.1});
+    for(let i=0;i<8;i++)flyers.push({k:pick(['coin','gem','chest']),x:x2+rnd(-120,120),y:y2,t:NOW+i*0.06,name:null});
+    banner('เปิดหีบยักษ์แล้ว!','#ffd04a',`แบ่ง ${pot} แต้มให้ ${Object.keys(bc.hits).length} คน`);sfx('win');shake=30;bigChest=null}}
+
+// ---------- รับเหตุการณ์จากไลฟ์ ----------
+function comment(name,text,pic){const p=player(name,pic),m=String(text).trim().match(/^([1-9])$/);
+  if(m){const c=+m[1]-1;if(c!==p.col){p.col=c;p.wc=c;popup(`ช่อง ${c+1}`,c*BS+BS/2,FRONT_Y-150,'#9fe08a',30)}}
+  p.say=String(text);p.sayT=NOW;p.q+=1}
+function like(name,n,pic){const p=player(name,pic);p.q+=n;addHearts(p,n)}
+function addHearts(p,n){p.hearts+=n;const l=lvOf(p.hearts);if(l>p.lv){p.lv=l;popup(`อัปเกรดเป็น${PICK[l-1].n}!`,p.x,FRONT_Y-180,PICK[l-1].c,34);sfx('levelup');
+  fx.push({type:'ring',x:p.x,y:FRONT_Y-60,r0:10,r1:130,c:PICK[l-1].c,t:NOW,life:0.6})}}
+const GIMG={};
+function giftImg(id,url){if(!id)return null;if(GIMG[id])return GIMG[id];const im=new Image();im.onerror=()=>{if(url&&im.src!==url)im.src=url};im.src=`/gifts/${id}.png`;return GIMG[id]=im}
+const TIERS=[{id:'5655',c:1,n:'ระเบิด',d:'3 ช่อง 2 ชั้น'},{id:'5879',c:30,n:'ไดนาไมต์',d:'ขุด 2 ชั้นเต็ม'},{id:'5660',c:100,n:'สว่านยักษ์',d:'ขุด 4 ชั้นเต็ม'},{id:'6267',c:299,n:'ระเบิดภูเขา',d:'8 ชั้น + หีบ'}];
+TIERS.forEach(t=>giftImg(t.id));
+function tierOf(c){return c>=299?3:c>=100?2:c>=30?1:0}
+function giftAct(p,t){const c=p.col;
+  if(t===0){const r=digRow(c);blast([r,r+1],[c-1,c,c+1].filter(i=>i>=0&&i<COLS),p)}
+  else if(t===1)blast([front,front+1],[...Array(COLS).keys()],p);
+  else if(t===2){fx.push({type:'drill',t:NOW,life:1.6});for(let i=0;i<4;i++)pending.push({t:NOW+0.2+i*0.3,fn:()=>{blast([front],[...Array(COLS).keys()],p);advance()}});sfx('plane')}
+  else{sfx('tank');for(let i=0;i<4;i++)pending.push({t:NOW+0.15+i*0.35,fn:()=>{blast([front,front+1],[...Array(COLS).keys()],p);advance()}});
+    pending.push({t:NOW+1.7,fn:()=>{collect('chest',p.x,FRONT_Y-60,p);collect('chest',p.x,FRONT_Y-60,p)}})}}
+function gift(name,coins,giftId,img,pic){const p=player(name,pic);addHearts(p,coins*5);const t=tierOf(coins),T=TIERS[t];
+  const icon=giftId?giftImg(giftId,img):giftImg(T.id);
+  const quiet=t===0&&(cine.cur&&cine.cur.name===name||cine.list.some(o=>o.name===name));
+  if(quiet){popup(`${coins}`,p.x,FRONT_Y-120,'#f0c86a',28,icon);giftAct(p,t);return}
+  showcase({name,p,icon,title:`${T.n}!`,sub:`${short(name,12)} ส่งของขวัญ`,coins,act:()=>giftAct(p,t),honor:coins>=100})}
+const followDone=new Set();
+function follow(name,pic,repeat){const p=player(name,pic);if(repeat||followDone.has(name))return;followDone.add(name);
+  showcase({name,p,icon:null,title:'ติดตาม = ระเบิดฟรี!',sub:`ขอบคุณ ${short(name,12)} ที่กดติดตาม`,coins:30,act:()=>giftAct(p,0)})}
+
+// ---------- โชว์ของขวัญกลางจอ แล้วกระแทกลงจุดที่ขุด / ซูมให้เกียรติของขวัญ 100 เหรียญขึ้นไป ----------
+const SHOW=1.0,FLY=0.38,HON=2.4;let cine={list:[],cur:null};
+function showcase(o){if(PRESIM){o.act();return}if(cine.list.length>=4){o.act();return}cine.list.push(o)}
+function giftSnd(c){return c>=299?'gift4':c>=100?'gift3':c>=30?'gift2':'gift1'}
+function updCine(){
+  if(!cine.cur&&cine.list.length){cine.cur=cine.list.shift();cine.cur.t0=NOW;sfx(cine.cur.honor?'honor':giftSnd(cine.cur.coins))}
+  const c=cine.cur;if(!c)return;const el=NOW-c.t0-(c.honor?HON:0);
+  if(c.honor&&el>=0&&!c.gs){c.gs=1;sfx(giftSnd(c.coins))}
+  if(el>=SHOW+FLY&&!c.done){c.done=true;c.act();advance();fx.push({type:'ring',x:c.p.x,y:FRONT_Y,r0:20,r1:240,c:'#fff',t:NOW,life:0.5});shake=Math.max(shake,16)}
+  if(el>=SHOW+FLY+0.2)cine.cur=null}
+
+// ---------- เสียง (ใช้ชุดเดียวกับป้อมสุดท้าย) ----------
+const SND={ctx:null,buf:{},last:{},choice:{}};let voices=0,PRESIM=false;
+const SGAP={wallhit:0.09,reload:0.08,gift1:0.12,gift2:0.2,gift3:0.3,grenade:0.15,levelup:0.4};
+function sndInit(){try{SND.ctx=new (window.AudioContext||window.webkitAudioContext)()}catch(e){return}
+  const c=SND.ctx;SND.master=c.createGain();SND.master.gain.value=0.9;SND.master.connect(c.destination);
+  SND.comp=c.createDynamicsCompressor();SND.comp.threshold.value=-18;SND.comp.knee.value=12;SND.comp.ratio.value=6;SND.comp.connect(SND.master);
+  SND.bus=c.createGain();SND.bus.connect(SND.comp);
+  fetch('/sounds').then(r=>r.json()).then(d=>{SND.choice=d.choice||{};Object.keys(d.list||{}).forEach(k=>{const v=SND.choice[k]||'a';
+    fetch(`/sfx/${k}_${v}.mp3`).then(r=>r.ok?r.arrayBuffer():Promise.reject()).then(b=>SND.ctx.decodeAudioData(b)).then(a=>{SND.buf[k]=a}).catch(()=>{})})}).catch(()=>{});
+  const resume=()=>{if(SND.ctx&&SND.ctx.state!=='running')SND.ctx.resume()};addEventListener('pointerdown',resume);addEventListener('keydown',resume)}
+function sfx(k,vol=1){const c=SND.ctx,b=SND.buf[k];if(!c||!b||c.state!=='running'||PRESIM)return;const now=performance.now()/1000;
+  if(SND.last[k]&&now-SND.last[k]<(SGAP[k]||0))return;if(voices>14)return;SND.last[k]=now;
+  const src=c.createBufferSource();src.buffer=b;if(k==='wallhit'||k==='reload')src.playbackRate.value=rnd(0.85,1.15);
+  const gn=c.createGain();gn.gain.value=vol;src.connect(gn).connect(SND.bus);voices++;src.onended=()=>voices--;src.start()}
+// เรียกชื่อทุกคนที่เข้ามาช่วยขุด เบาๆ ต่อด้วยเสียงกริ๊ง คิวยาวอ่านเร็วขึ้น ชื่อที่รอเกิน 2 นาทีข้าม
+const ANN=[];let annBusy=false;
+function announce(name){if(PRESIM)return;if(ANN.length>=40)ANN.shift();ANN.push({name,t:performance.now()/1000});if(!annBusy)annNext()}
+async function annNext(){while(ANN.length&&performance.now()/1000-ANN[0].t>120)ANN.shift();const a=ANN.shift();if(!a){annBusy=false;return}annBusy=true;const c=SND.ctx,rush=ANN.length>=3;
+  if(!c||c.state!=='running'){annBusy=false;ANN.length=0;return}
+  const nameP=fetch('/say?v=niwat&t='+encodeURIComponent(a.name),{cache:'no-cache'}).then(r=>r.ok?r.arrayBuffer():null).then(b=>b?c.decodeAudioData(b):null).catch(()=>null);
+  const play=(b,vol)=>new Promise(res=>{if(!b)return res();const s=c.createBufferSource();s.buffer=b;if(rush)s.playbackRate.value=1.12;const gn=c.createGain();gn.gain.value=vol;s.connect(gn).connect(SND.master);s.onended=res;s.start()});
+  if(MUS.bus)MUS.bus.gain.setTargetAtTime(0.85,c.currentTime,0.1);
+  if(!rush)await play(SND.buf.gift1,0.3);
+  const nb=await Promise.race([nameP,new Promise(r=>setTimeout(()=>r(null),6000))]);await play(nb,0.7);
+  if(!ANN.length&&MUS.bus)MUS.bus.gain.setTargetAtTime(1,c.currentTime,0.4);setTimeout(annNext,rush?150:450)}
+const MUS={src:null};
+function musicTick(){const c=SND.ctx,b=SND.buf.bgm_battle;if(!c||c.state!=='running'||PRESIM||!b)return;
+  if(!MUS.bus){MUS.bus=c.createGain();MUS.bus.gain.value=1;MUS.bus.connect(SND.master)}
+  if(!MUS.src){const s=c.createBufferSource();s.buffer=b;s.loop=true;const gn=c.createGain();gn.gain.value=0.8;s.connect(gn).connect(MUS.bus);s.start();MUS.src=s}}
+sndInit();
+
+// ---------- update ----------
+function update(dt){
+  musicTick();updCine();
+  pending=pending.filter(e=>{if(NOW>=e.t){e.fn();return false}return true});
+  const act=active(),workers=act.length?act:[];
+  // บอทขุดช้าๆ ให้จอขยับตลอด คนน้อยบอทช่วยมากหน่อย
+  BOT.q+=dt*(act.length?0.6:1.6);BOT.last=NOW;
+  [...workers,BOT].forEach(p=>{
+    p.cd-=dt;const rate=p.q>20?16:p.q>6?10:6;
+    if(p.q>=1&&p.cd<=0){p.q-=1;p.cd=1/rate;const dmg=PICK[p.lv-1].m;
+      hit(p,dmg);advance()}
+    p.q=Math.min(p.q,80);
+    const tx=p.wc*BS+BS/2+(p.slot-0.5)*56;p.x+=(tx-p.x)*Math.min(1,dt*6)});
+  camY+=(front*BS-camY)*Math.min(1,dt*4);
+  evT-=dt;if(evT<=0){evT=rnd(50,80);event()}
+  if(DEMO)sim();
+  flyers=flyers.filter(f=>NOW-f.t<1.4);fx=fx.filter(f=>NOW-f.t<f.life);pops=pops.filter(p=>NOW-p.t<1.4);
+}
+
+// ---------- วาด ----------
+function txt(s,x,y,size,col='#fff',align='left',w=700,stroke='#000'){g.font=`${w} ${size}px ${FONT}`;g.textAlign=align;g.lineJoin='round';
+  g.lineWidth=Math.max(5,size/4.5);g.strokeStyle=stroke;g.strokeText(s,x,y);g.fillStyle=col;g.fillText(s,x,y)}
+function panel(x,y,w,h,bc='#fff',a=0.8){g.beginPath();g.roundRect(x,y,w,h,18);g.fillStyle=`rgba(14,16,20,${a})`;g.fill();g.globalAlpha=0.85;g.strokeStyle=bc;g.lineWidth=3;g.beginPath();g.roundRect(x+2,y+2,w-4,h-4,16);g.stroke();g.globalAlpha=1}
+function glow(x,y,r,col,a){if(!(r>0))return;g.save();g.globalCompositeOperation='lighter';const gr=g.createRadialGradient(x,y,0,x,y,r);gr.addColorStop(0,col);gr.addColorStop(1,'rgba(0,0,0,0)');g.globalAlpha=a;g.fillStyle=gr;g.beginPath();g.arc(x,y,r,0,7);g.fill();g.restore()}
+function heart(x,y,s,col='#e5566b'){g.fillStyle=col;g.beginPath();g.moveTo(x,y+s*0.35);g.bezierCurveTo(x-s*0.9,y-s*0.25,x-s*0.35,y-s*0.85,x,y-s*0.35);g.bezierCurveTo(x+s*0.35,y-s*0.85,x+s*0.9,y-s*0.25,x,y+s*0.35);g.fill()}
+function drawImg(im,x,y,s){if(im&&im.complete&&im.naturalWidth){g.imageSmoothingEnabled=true;g.drawImage(im,x-s/2,y-s/2,s,s);return true}return false}
+function icon(k,x,y,s){const c=ICON[k];g.imageSmoothingEnabled=false;g.drawImage(c,x-s/2,y-s/2*c.height/c.width,s,s*c.height/c.width)}
+function avatar(p,x,y,r,ring){r=Math.max(1,r);g.save();g.beginPath();g.arc(x,y,r+4,0,7);g.fillStyle=ring;g.fill();g.beginPath();g.arc(x,y,r,0,7);g.clip();
+  if(p.pic&&p.pic.complete&&p.pic.naturalWidth){g.imageSmoothingEnabled=true;g.drawImage(p.pic,x-r,y-r,r*2,r*2)}
+  else{g.fillStyle=p.shirt;g.fillRect(x-r,y-r,r*2,r*2);g.font=`700 ${r}px ${FONT}`;g.textAlign='center';g.fillStyle='#fff';g.fillText((p.name||'?').slice(0,1).toUpperCase(),x,y+r*0.36)}g.restore()}
+function bubble(text,x,y){const t=text.length>16?text.slice(0,15)+'…':text;g.font=`600 24px ${FONT}`;const w=Math.max(60,g.measureText(t).width+28),h=40,bx=clamp(x-w/2,8,W-8-w);
+  g.fillStyle='#fffdf6';g.beginPath();g.roundRect(bx,y-h,w,h,14);g.fill();g.beginPath();g.moveTo(x-9,y-1);g.lineTo(x+9,y-1);g.lineTo(x,y+12);g.fill();g.fillStyle='#1d1f24';g.textAlign='center';g.fillText(t,bx+w/2,y-12)}
+
+// คนงานเหมือง: ตัวพิกเซล หัวเป็นรูปโปรไฟล์ หมวกนิรภัยมีไฟฉาย จอบตามเลเวล
+function miner(p,x,y){const u=4,sw=NOW-p.swing<0.12?1-(NOW-p.swing)/0.12:0,R=(a,b,w,h,c)=>{g.fillStyle=c;g.fillRect(Math.round(x+a*u),Math.round(y+b*u),w*u,h*u)};
+  g.globalAlpha=0.35;g.fillStyle='#000';g.beginPath();g.ellipse(x,y,26,6,0,0,7);g.fill();g.globalAlpha=1;
+  R(-5,-6,4,6,'#3a3a44');R(1,-6,4,6,'#3a3a44');R(-6,-2,5,2,'#2a1e16');R(1,-2,5,2,'#2a1e16');           // ขา รองเท้า
+  R(-6,-15,12,9,p.shirt);R(-6,-15,12,1,shade(p.shirt,1.25));R(-4,-15,2,9,'#6a4a2a');R(2,-15,2,9,'#6a4a2a');R(-6,-8,12,2,'#3a2a1a');  // เสื้อ สายเอี๊ยม เข็มขัด
+  R(-9,-14,3,6,p.shirt);R(-9,-8,3,2,'#d9a982');                                                    // แขนซ้าย
+  // จอบ: หมุนตามจังหวะทุบ
+  g.save();g.translate(x+7*u,y-12*u);g.rotate(-1.1+sw*1.7);g.fillStyle='#6a4a2a';g.fillRect(-3,-56,7,60);
+  g.fillStyle=PICK[p.lv-1].c;g.beginPath();g.moveTo(-26,-50);g.quadraticCurveTo(0,-68,30,-52);g.lineTo(28,-46);g.quadraticCurveTo(0,-58,-24,-44);g.fill();g.restore();
+  R(6,-14,3,6,p.shirt);R(6,-8,3,2,'#d9a982');
+  const hy=y-15*u-24;avatar(p,x,hy,22,p.bot?'#8a8a7a':PICK[p.lv-1].c);
+  // หมวกนิรภัย + ไฟ
+  g.fillStyle='#e8b830';g.beginPath();g.ellipse(x,hy-14,27,15,0,Math.PI,0);g.fill();g.fillRect(x-31,hy-16,62,6);g.fillStyle='#fff6c0';g.fillRect(x-6,hy-27,12,9)}
+
+let BG=null;
+function render(){
+  const sx=shake>0.5?rnd(-shake,shake)*0.5:0,sy=shake>0.5?rnd(-shake,shake)*0.5:0;g.setTransform(1,0,0,1,sx,sy);
+  const zf=zoneOf(front),Z=zoneInfo(zf);
+  // พื้นหลังถ้ำ (โพรงที่ขุดแล้ว)
+  g.fillStyle=Z.bg;g.fillRect(-20,-20,W+40,H+40);
+  const r0=Math.floor((camY-FRONT_Y)/BS)-1,r1=Math.ceil((camY+H-FRONT_Y)/BS)+1;
+  // ผิวดิน: ท้องฟ้า หญ้า เต็นท์
+  const surf=rowTop(0);
+  if(surf>-200){const sk=g.createLinearGradient(0,surf-900,0,surf);sk.addColorStop(0,'#5a7896');sk.addColorStop(1,'#c9a87a');g.fillStyle=sk;g.fillRect(0,surf-1600,W,1600);
+    g.fillStyle='#e9d3a0';g.beginPath();g.arc(860,surf-420,60,0,7);g.fill();
+    g.fillStyle='#5c6b48';g.fillRect(0,surf-20,W,24);g.fillStyle='#738456';for(let i=0;i<W;i+=12)g.fillRect(i,surf-28+(i*7%10),4,10);
+    g.fillStyle='#7a5a3a';g.beginPath();g.moveTo(80,surf-20);g.lineTo(170,surf-150);g.lineTo(260,surf-20);g.fill();g.fillStyle='#5a3e26';g.beginPath();g.moveTo(170,surf-150);g.lineTo(260,surf-20);g.lineTo(190,surf-20);g.fill();
+    g.fillStyle='#4a3a2a';g.fillRect(900,surf-140,10,120);g.fillStyle='#c0392b';g.fillRect(910,surf-140,70,40);txt('จุดเริ่มขุด',945,surf-152,24,'#fff','center',600)}
+  // ผนังถ้ำด้านหลังของชั้นที่ขุดแล้ว ไม้ค้ำ คบเพลิง
+  for(let r=Math.max(0,r0);r<=r1;r++){const y=rowTop(r),zr=zoneOf(r),ZZ=ZONES[zr%ZONES.length];
+    g.fillStyle=shade(ZZ.b,0.42);g.fillRect(0,y,W,BS);g.fillStyle='rgba(0,0,0,.18)';for(let c=0;c<COLS;c++)if((r+c)%3===0)g.fillRect(c*BS+20,y+30,40,20);
+    if(r%4===0){g.fillStyle='#5a3e26';g.fillRect(0,y,W,10);g.fillRect(BS*3-6,y,12,BS);g.fillRect(BS*6-6,y,12,BS)}
+    if(r%4===2){[60,W-60].forEach((tx,i)=>{g.fillStyle='#4a3a2a';g.fillRect(tx-4,y+50,8,30);const fl=6+Math.sin(NOW*12+r+i)*3;g.fillStyle='#ffb04a';g.beginPath();g.ellipse(tx,y+44,7,fl+6,0,0,7);g.fill();glow(tx,y+44,110,'rgba(255,170,80,1)',0.35)})}}
+  // บันไดกลางโพรง
+  g.fillStyle='#7a5a3a';for(let y=Math.max(surf,-40);y<rowTop(front);y+=36){g.fillRect(532,y,40,6)}g.fillRect(524,Math.max(surf,-40),8,Math.max(0,rowTop(front)-Math.max(surf,-40)));g.fillRect(572,Math.max(surf,-40),8,Math.max(0,rowTop(front)-Math.max(surf,-40)));
+  // เส้นสถิติเดิม
+  if(record>0){const y=rowTop(record+1);if(y>380&&y<H){g.setLineDash([24,14]);g.strokeStyle='#ffd04a';g.lineWidth=5;g.beginPath();g.moveTo(0,y);g.lineTo(W,y);g.stroke();g.setLineDash([]);
+    g.fillStyle='rgba(14,16,20,.85)';g.beginPath();g.roundRect(W-330,y-50,310,42,12);g.fill();txt(`สถิติเดิม ${record} ม.`,W-175,y-19,26,'#ffd04a','center',700)}}
+  // บล็อก
+  for(let r=Math.max(0,r0);r<=r1;r++){const y=rowTop(r);if(y>H||y<-BS)continue;const rw=row(r),zr=zoneOf(r);
+    rw.forEach((b,c)=>{if(b.hp<=0)return;const x=c*BS,jit=NOW-b.hitT<0.08?rnd(-3,3):0;g.imageSmoothingEnabled=false;
+      g.drawImage(mkTex(zr,b.hard)[b.tex],x+jit,y,BS,BS);
+      const dmg=1-b.hp/b.max;if(dmg>0.15&&!b.chestPart)g.drawImage(CRACK[dmg>0.66?2:dmg>0.4?1:0],x+jit,y,BS,BS);
+      if(b.loot&&r<=front+5){const tw=0.5+0.5*Math.sin(NOW*3+c*1.7+r);g.globalAlpha=0.35+0.4*tw;icon(b.loot,x+BS/2,y+BS/2,b.loot==='chest'?54:40);g.globalAlpha=1;
+        const s=4+5*tw;g.fillStyle='#fff8d0';g.fillRect(x+BS*0.7-s,y+BS*0.28-1.5,s*2,3);g.fillRect(x+BS*0.7-1.5,y+BS*0.28-s,3,s*2)}
+      if(r===front&&!b.chestPart){g.globalAlpha=0.75;txt(`${c+1}`,x+BS/2,y+BS-14,30,'#fff','center',700);g.globalAlpha=1}});
+    if(r>front+4){const k=Math.min(0.6,(r-front-4)*0.15);g.fillStyle=`rgba(0,0,0,${k})`;g.fillRect(0,y,W,BS)}
+    if(zr!==zoneOf(r-1)&&r>0){g.fillStyle='rgba(255,208,74,.9)';g.fillRect(0,y-3,W,6);const zi=zoneInfo(zr);txt(`${r} ม. : ${zi.n}`,20,y+40,26,'#ffd04a','left',700)}}
+  // หีบยักษ์
+  if(bigChest){const bc=bigChest,x=3*BS,y=rowTop(bc.r),jit=NOW-(bc.hitT||-9)<0.08?rnd(-4,4):0;glow(x+180,y+60,260,'rgba(255,200,80,1)',0.35+0.1*Math.sin(NOW*5));
+    g.imageSmoothingEnabled=false;g.drawImage(ICON.chest,x+20+jit,y-10,320,256);g.fillStyle='#222';g.fillRect(x+30,y+BS-22,300,16);g.fillStyle='#ffd04a';g.fillRect(x+32,y+BS-20,296*Math.max(0,bc.hp/bc.max),12);
+    txt('หีบยักษ์',x+180,y-16,32,'#ffd04a','center',700)}
+  // คนงาน
+  const ws=[...active(),BOT].sort((a,b)=>a.slot-b.slot),rank={},seen={};ws.forEach(p=>{rank[p.name]=seen[p.wc]=(seen[p.wc]??-1)+1});
+  ws.forEach(p=>{miner(p,p.x,rowTop(digRow(p.wc)))});
+  ws.forEach(p=>{const r=digRow(p.wc),y=rowTop(r)-150-rank[p.name]*28;if(!p.bot){txt(short(p.name,8)+(p.lv>1?` ${PICK[p.lv-1].n.replace('จอบ','')}`:''),p.x,y-6,20,p.lv>=4?'#ffd04a':'#fff','center',600);
+    if(p.say&&NOW-p.sayT<3)bubble(p.say,p.x,y-32)}else txt('บอท',p.x,y-6,18,'#bbb','center',500)});
+  // ไฟฉายจากหมวก
+  ws.forEach(p=>glow(p.x,rowTop(digRow(p.wc))+30,150,'rgba(255,240,190,1)',0.18));
+  // เอฟเฟกต์
+  fx.forEach(f=>{const t=NOW-f.t,k=t/f.life;
+    if(f.type==='chip'||f.type==='spark'||f.type==='chunk'){const x=f.x+f.vx*t,y=f.y+f.vy*t+700*t*t;g.globalAlpha=1-k;g.fillStyle=f.c;const s=f.type==='chunk'?f.s:f.type==='chip'?8:5;g.fillRect(x-s/2,y-s/2,s,s);g.globalAlpha=1}
+    else if(f.type==='dust'){g.globalAlpha=0.5*(1-k);g.fillStyle='#c8b8a0';g.beginPath();g.arc(f.x,f.y,40+120*k,0,7);g.fill();g.globalAlpha=1}
+    else if(f.type==='ring'){g.globalAlpha=1-k;g.strokeStyle=f.c;g.lineWidth=8*(1-k)+2;g.beginPath();g.arc(f.x,f.y,f.r0+(f.r1-f.r0)*ease.out(k),0,7);g.stroke();g.globalAlpha=1}
+    else if(f.type==='boom'){glow(f.x,f.y,f.r*(0.6+k),'rgba(255,190,90,1)',0.9*(1-k));g.globalAlpha=1-k;g.strokeStyle='#fff3c0';g.lineWidth=10*(1-k)+2;g.beginPath();g.arc(f.x,f.y,f.r*ease.out(k),0,7);g.stroke();g.globalAlpha=1}
+    else if(f.type==='conf'){const x=f.x+f.vx*t,y=f.y+f.vy*t;g.save();g.translate(x,y);g.rotate(f.rot+f.vr*t);g.globalAlpha=Math.min(1,(f.life-t)/0.5);g.fillStyle=f.c;g.fillRect(-f.w/2,-f.w/4,f.w,f.w/2);g.restore();g.globalAlpha=1}
+    else if(f.type==='drill'){const y=rowTop(front)-120+k*260,x=540;g.globalAlpha=Math.min(1,(f.life-t)/0.3);g.fillStyle='#8a8f96';g.fillRect(x-70,y-200,140,170);g.fillStyle='#c9ccd1';
+      g.beginPath();g.moveTo(x-70,y-30);g.lineTo(x+70,y-30);g.lineTo(x,y+90);g.fill();g.strokeStyle='#5a5f66';g.lineWidth=6;for(let i=0;i<4;i++){const o=((NOW*240+i*30)%120);g.beginPath();g.moveTo(x-70+o*0.58,y-30+o);g.lineTo(x+70-o*0.58,y-30+o+14);g.stroke()}g.globalAlpha=1}});
+  // สมบัติที่ลอยขึ้นแล้วบินเข้าแถบอันดับ
+  flyers.forEach(f=>{const k=(NOW-f.t)/1.4;if(k<0)return;const up=Math.min(1,k/0.35),fl=Math.max(0,(k-0.45)/0.55),tx=540,ty=SAFE_T+318;
+    const x=f.x+(tx-f.x)*ease.in(fl),y=f.y-80*ease.out(up)+(ty-(f.y-80))*ease.in(fl),s=(f.k==='chest'?90:64)*(0.5+0.5*ease.back(up))*(1-fl*0.6);
+    glow(x,y,s,'rgba(255,230,150,1)',0.4*(1-fl));icon(f.k,x,y,s)});
+  pops.forEach(p=>{const k=(NOW-p.t)/1.4;g.globalAlpha=1-k*k;const y=p.y-k*70;if(p.img){drawImg(p.img,p.x,y-40,70);txt(p.s,p.x,y+24,26,p.col,'center')}else txt(p.s,p.x,y,p.size,p.col,'center');g.globalAlpha=1});
+  g.setTransform(1,0,0,1,0,0);
+  if(NOW-zoneFlash<0.6){g.fillStyle=`rgba(255,240,200,${0.5*(1-(NOW-zoneFlash)/0.6)})`;g.fillRect(0,0,W,H)}
+  if(goldRush>NOW){g.strokeStyle=`rgba(159,224,138,${0.5+0.3*Math.sin(NOW*8)})`;g.lineWidth=14;g.strokeRect(7,SAFE_T+372,W-14,SAFE_B-SAFE_T-372)}
+  hud();
+  const bn=banners.find(b=>NOW>=b.t&&NOW<b.t+2.4);banners=banners.filter(b=>NOW<b.t+2.4);
+  if(bn&&!cine.cur){const k=ease.back(Math.min(1,(NOW-bn.t)/0.3));g.save();g.translate(540,560);g.scale(k,k);g.translate(-540,-560);panel(70,490,940,bn.sub?150:100,bn.col,0.9);txt(bn.s,540,556,48,bn.col,'center');if(bn.sub)txt(bn.sub,540,612,30,'#fff','center',500);g.restore()}
+  if(!active().length&&!cine.cur){const k=0.75+0.25*Math.sin(NOW*4);g.globalAlpha=k;panel(140,1200,800,150,'#f0c86a');txt('กดหัวใจ เพื่อช่วยขุด!',540,1268,48,'#f0c86a','center');txt('ข้างล่างมีสมบัติรออยู่',540,1324,30,'#fff','center',500);g.globalAlpha=1}
+  drawCine();
+  if(SND.ctx&&SND.ctx.state!=='running'){g.fillStyle='rgba(14,16,20,.85)';g.beginPath();g.roundRect(290,1846,500,52,26);g.fill();txt('คลิกจอ 1 ครั้ง เพื่อเปิดเสียง',540,1882,28,'#f0c86a','center',600)}
+  if(SHOWSAFE){g.fillStyle='rgba(255,0,0,.25)';g.fillRect(0,0,W,SAFE_T);g.fillRect(0,SAFE_B,W,H-SAFE_B)}
+}
+function hud(){
+  // แถวบน: ความลึก ชั้น สถิติ
+  panel(16,SAFE_T,1048,104,'#ffffff');
+  txt('ลึก',36,SAFE_T+44,24,'#cfcfcf','left',500);txt(`${front} ม.`,36,SAFE_T+90,44,'#f0c86a');
+  const zi=zoneInfo(zoneOf(front)),pr=(front%ZLEN)/ZLEN;txt(zi.n,540,SAFE_T+40,30,'#fff','center');
+  g.fillStyle='#222';g.fillRect(300,SAFE_T+58,480,24);g.fillStyle='#e8a050';g.fillRect(302,SAFE_T+60,476*pr,20);txt(`อีก ${ZLEN-front%ZLEN} ม. ถึงชั้นต่อไป`,540,SAFE_T+80,18,'#fff','center',600);
+  txt('สถิติ',1044,SAFE_T+44,24,'#cfcfcf','right',500);txt(record?`${Math.max(record,recordBroken?front:0)} ม.`:'-',1044,SAFE_T+90,40,'#ffd04a','right');
+  // วิธีเล่น
+  const y0=SAFE_T+112;panel(16,y0,1048,140,'#e8a050');
+  heart(44,y0+24,22);txt('กดหัวใจ = ขุด',64,y0+33,26,'#fff','left',700);txt('พิมพ์ 1-9 = เลือกช่อง',540,y0+33,26,'#9fe08a','center',700);txt('ขุดแตก = ได้สมบัติ',1044,y0+33,26,'#f0c86a','right',700);
+  TIERS.forEach((tr,i)=>{const cx=140+i*266;drawImg(GIMG[tr.id],cx-70,y0+90,52);txt(tr.n,cx-36,y0+82,24,'#f0c86a','left',700);txt(tr.d,cx-36,y0+110,18,'#d8d8d8','left',500);txt(`${tr.c} เหรียญ`,cx-36,y0+132,16,'#aaa','left',500)});
+  panel(16,SAFE_T+258,1048,36,'#f0c86a',0.8);txt('หัวใจสะสม = จอบแรงขึ้น',36,SAFE_T+284,20,'#fff','left',600);txt('กดติดตาม = ระเบิดฟรี 1 ลูก',1044,SAFE_T+284,20,'#f0c86a','right',600);
+  // Top 3 นักขุด
+  const top=Object.values(P).filter(p=>p.pts>0).sort((a,b)=>b.pts-a.pts).slice(0,3);
+  panel(16,SAFE_T+300,1048,44,'#ffd04a',0.82);txt('TOP',36,SAFE_T+332,22,'#ffd04a','left',700);
+  if(!top.length)txt('ยังไม่มีใครเจอสมบัติ ขุดเป็นคนแรกเลย!',560,SAFE_T+331,22,'#cfcfcf','center',500);
+  top.forEach((p,i)=>{const x=100+i*322,cc=['#e8c547','#d0d6dc','#c98a52'][i];txt(`${i+1}`,x,SAFE_T+332,24,cc,'center');avatar(p,x+32,SAFE_T+322,14,cc);
+    txt(short(p.name,9),x+54,SAFE_T+331,22,'#fff','left',600);txt(p.pts.toLocaleString(),x+300,SAFE_T+331,22,'#f0c86a','right',700)});
+  if(!DEMO&&live.state!=='live')txt({connecting:'กำลังต่อไลฟ์...',offline:'รอไลฟ์เริ่ม...',error:'ต่อไลฟ์ไม่ได้',server:'ไม่เจอ server.js'}[live.state]||'',540,SAFE_T+380,24,'#e09a4a','center',500);
+  if(goldRush>NOW)txt(`สมบัติ x2 อีก ${Math.ceil(goldRush-NOW)} วิ`,540,SAFE_T+386,28,'#9fe08a','center',700)}
+function drawCine(){const c=cine.cur;if(!c)return;
+  if(c.honor&&NOW-c.t0<HON){const k=(NOW-c.t0)/HON,a=Math.max(0,Math.min(1,k*5,(1-k)*4)),px=c.p.x,py=rowTop(digRow(c.p.wc))-90;
+    const vg=g.createRadialGradient(px,py,110,px,py,560);vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,`rgba(0,0,0,${0.78*a})`);g.fillStyle=vg;g.fillRect(0,0,W,H);
+    g.save();g.globalCompositeOperation='lighter';[[110,420],[970,420]].forEach(([bx,by],i)=>{const tx=px+Math.sin(NOW*1.6+i*2)*40,gr=g.createLinearGradient(bx,by,tx,py);gr.addColorStop(0,`rgba(255,240,190,${0.55*a})`);gr.addColorStop(1,`rgba(255,220,140,${0.12*a})`);
+      g.fillStyle=gr;g.beginPath();g.moveTo(bx-14,by);g.lineTo(bx+14,by);g.lineTo(tx+150,py+90);g.lineTo(tx-150,py+90);g.fill()});g.restore();
+    const ck=ease.back(Math.min(1,k*4));g.save();g.translate(540,1150);g.scale(ck,ck);g.translate(-540,-1150);g.globalAlpha=a;
+    g.fillStyle='rgba(14,16,20,.9)';g.beginPath();g.roundRect(90,1070,900,160,26);g.fill();g.strokeStyle='#e8c547';g.lineWidth=5;g.beginPath();g.roundRect(93,1073,894,154,24);g.stroke();
+    avatar(c.p,190,1150,52,'#e8c547');txt('ขอบคุณสำหรับของขวัญ',270,1126,28,'#f0e6c8','left',500);txt(short(c.name,12),270,1186,54,'#f0c86a','left',700);drawImg(c.icon,890,1140,96);
+    g.restore();g.globalAlpha=1;return}
+  const el=NOW-c.t0-(c.honor?HON:0);
+  if(el<SHOW){const k=ease.back(Math.min(1,el/0.28)),fade=el>SHOW-0.12?(SHOW-el)/0.12:1;g.fillStyle=`rgba(0,0,0,${0.45*Math.min(1,el/0.15)})`;g.fillRect(0,0,W,H);
+    g.save();g.translate(540,780);g.rotate(NOW*0.8);g.globalAlpha=0.25*Math.min(1,el/0.2);g.fillStyle='#f0c86a';for(let i=0;i<12;i++){g.rotate(Math.PI/6);g.beginPath();g.moveTo(0,0);g.lineTo(-40,-420);g.lineTo(40,-420);g.fill()}g.restore();g.globalAlpha=1;
+    const s=200*k;if(!drawImg(c.icon,540,760,s))heart(540,780,s*0.6);avatar(c.p,540-s*0.42,760+s*0.36,46*k,'#f0c86a');
+    g.globalAlpha=fade;txt(c.title,540,960,86*Math.min(1,k),'#f0c86a','center');txt(c.sub,540,1018,34,'#fff','center',600);g.globalAlpha=1}
+  else if(!c.done){const k=Math.min(1,(el-SHOW)/FLY),tx=c.p.x,ty=FRONT_Y,x=540+(tx-540)*ease.in(k),y=760+(ty-760)*ease.in(k)-Math.sin(k*Math.PI)*160;if(!drawImg(c.icon,x,y,140*(1-k*0.4)))heart(x,y,60)}}
+
+// ---------- คนดูจำลอง ----------
+const FAKE=['ploy_99','mek.k','nongbeam','jaa_jaa','tonkla','minnie.th','pond2002','got_za','ice.cream','bank_bk','fern.f','oat_oat'];
+let simT={j:0,l:0,g:8,f:20};
+function sim(){const act=Object.values(P).filter(p=>NOW-p.last<IDLE);
+  if(NOW>simT.j){simT.j=NOW+rnd(3,7);comment(pick(FAKE),pick(['สู้ๆ','1','5','9','ขุดเลย','3','7','เจอทองยัง']))}
+  if(NOW>simT.l){simT.l=NOW+0.4;if(act.length&&Math.random()<0.7)like(pick(act).name,rnd(1,8)|0)}
+  if(NOW>simT.g){simT.g=NOW+rnd(8,16);if(act.length)gift(pick(act).name,pick([1,1,1,5,30,30,100,299]))}
+  if(NOW>simT.f){simT.f=NOW+rnd(20,40);if(act.length)follow(pick(act).name)}}
+
+// ---------- ข้อมูลจริงจาก server.js ----------
+const ids={},used={};
+function nameFor(id,name){if(ids[id])return ids[id];let n=name,i=2;while(used[n]&&used[n]!==id)n=`${name}${i++}`;used[n]=id;return ids[id]=n}
+function onLive(ev){if(ev.type==='status'){live={...live,...ev};return}
+  const name=ev.id?nameFor(ev.id,ev.name):ev.name;
+  if(ev.type==='chat')comment(name,ev.text,ev.pic);else if(ev.type==='like')like(name,ev.count||1,ev.pic);
+  else if(ev.type==='gift')gift(name,ev.coins||1,ev.giftId,ev.img,ev.pic);else if(ev.type==='follow')follow(name,ev.pic,ev.repeat)}
+if(!DEMO){let wsT=0;const open=()=>{const ws=new WebSocket(`ws://${location.host}/ws`);ws.onmessage=m=>{try{onLive(JSON.parse(m.data))}catch(e){console.error(e)}};
+  ws.onclose=()=>{live.state='server';clearTimeout(wsT);wsT=setTimeout(open,2000)}};open()}
+
+// ---------- loop (error ส่วนไหนก็ตาม เฟรมถัดไปยังเดินต่อ) ----------
+let last=performance.now(),errShown=0;
+const START=+Q.get('t')||0;PRESIM=true;for(let t=0;t<START;t+=1/30){NOW+=1/30;update(1/30)}PRESIM=false;
+function loop(t){requestAnimationFrame(loop);const dt=Math.min(0.05,(t-last)/1000)*SPEED;last=t;NOW+=dt;
+  try{update(dt)}catch(e){if(errShown++<5)console.error('update',e)}shake*=0.86;
+  try{g.setTransform(1,0,0,1,0,0);g.globalAlpha=1;g.globalCompositeOperation='source-over';render()}catch(e){if(errShown++<5)console.error('render',e)}}
+document.fonts.load('700 40px Kanit').finally(()=>requestAnimationFrame(loop));
+</script></body></html>

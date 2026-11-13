@@ -24,7 +24,19 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   try { if (await handleSound(req, res, url)) return; } catch (e) { console.log('sound:', String(e.message || e).slice(0, 120)); if (!res.headersSent) { res.writeHead(500); return res.end(); } }
   // หน้าแรก = ป้อมสุดท้าย (ทาวเวอร์ดีเฟนซ์)  /ghost = ร้านผีกะศุกร์13 เวอร์ชันแรก
-  const page = { '/': 'defense.html', '/index.html': 'defense.html', '/ghost': 'game.html' }[url.pathname];
+  const page = { '/': 'defense.html', '/index.html': 'defense.html', '/ghost': 'game.html', '/dig': 'dig.html' }[url.pathname];
+  // สถิติความลึกของเกมขุดสมบัติ เก็บข้ามไลฟ์ (รับแค่ตัวเลขที่มากขึ้น)
+  if (url.pathname === '/dig-record') {
+    const f = path.join(DIR, 'dig-record.json');
+    let rec = { best: 0 }; try { rec = JSON.parse(fs.readFileSync(f, 'utf8')); } catch {}
+    if (req.method === 'POST') {
+      let body = ''; for await (const ch of req) { body += ch; if (body.length > 200) break; }
+      const best = Math.floor(+(JSON.parse(body || '{}').best) || 0);
+      if (best > (rec.best || 0) && best < 100000) { rec = { best, date: new Date().toISOString() }; fs.writeFileSync(f, JSON.stringify(rec)); }
+    }
+    res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+    return res.end(JSON.stringify(rec));
+  }
   if (page) {
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
     return fs.createReadStream(path.join(DIR, page)).pipe(res);

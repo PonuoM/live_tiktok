@@ -21,3 +21,4 @@ followed.json
 *.avi
 *.m4v
 !gifts/*.png
+dig-record.json
