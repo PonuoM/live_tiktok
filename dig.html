@@ -11,7 +11,7 @@ canvas{height:100vh;aspect-ratio:9/16}
 // ===== ขุดสมบัติ: คนดูช่วยกันขุดลงใต้ดิน ไม่มีแพ้ เป้าคือลึกกว่าสถิติเดิม =====
 // กดหัวใจ = ขุด  พิมพ์ 1-9 = เลือกช่อง  บล็อกที่ใครขุดแตก สมบัติในนั้นเป็นของคนนั้น  ของขวัญ = ระเบิดหลายชั้น
 // ?demo=1 คนดูจำลอง  ?speed=3 เร่งเวลา  ?safe=1 ระบายส่วนที่ UI ของ TikTok บัง  ?depth=60 เริ่มที่ความลึกนั้น (ไว้ตรวจฉาก)
-const Q=new URLSearchParams(location.search),DEMO=Q.has('demo'),SPEED=+Q.get('speed')||1,SHOWSAFE=Q.has('safe');
+const Q=new URLSearchParams(location.search),DEMO=Q.has('demo')||Q.has('test'),SPEED=+Q.get('speed')||1,SHOWSAFE=Q.has('safe');
 const cv=document.getElementById('c'),g=cv.getContext('2d');
 const W=1080,H=1920,FONT='Kanit, Tahoma, sans-serif';
 const rnd=(a,b)=>a+Math.random()*(b-a),pick=a=>a[Math.random()*a.length|0],clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -249,7 +249,7 @@ function update(dt){
     const tx=p.wc*BS+BS/2+(p.slot-0.5)*56;p.x+=(tx-p.x)*Math.min(1,dt*6)});
   camY+=(front*BS-camY)*Math.min(1,dt*4);
   evT-=dt;if(evT<=0){evT=rnd(50,80);event()}
-  if(DEMO)sim();
+  if(Q.has('demo')||(window.__crowd&&__crowd()))sim();
   flyers=flyers.filter(f=>NOW-f.t<1.4);fx=fx.filter(f=>NOW-f.t<f.life);pops=pops.filter(p=>NOW-p.t<1.4);
 }
 
@@ -401,6 +401,23 @@ function sim(){const act=Object.values(P).filter(p=>NOW-p.last<IDLE);
   if(NOW>simT.l){simT.l=NOW+0.4;if(act.length&&Math.random()<0.7)like(pick(act).name,rnd(1,8)|0)}
   if(NOW>simT.g){simT.g=NOW+rnd(8,16);if(act.length)gift(pick(act).name,pick([1,1,1,5,30,30,100,299]))}
   if(NOW>simT.f){simT.f=NOW+rnd(20,40);if(act.length)follow(pick(act).name)}}
+
+
+// ---------- โหมดทดสอบ ?test=1: เล่นเองเหมือนเป็นคนดู ไม่ต้องเปิดไลฟ์ ----------
+if(Q.has("test")){const me="ผู้ทดสอบ",bar=document.createElement("div");
+  bar.style.cssText="position:fixed;left:0;right:0;bottom:0;background:rgba(14,16,20,.92);padding:8px;display:flex;flex-wrap:wrap;gap:6px;justify-content:center;font:600 15px Kanit,Tahoma;z-index:9";
+  const btn=(label,fn,bg="#3a3f48")=>{const b=document.createElement("button");b.textContent=label;b.style.cssText=`background:${bg};color:#fff;border:0;border-radius:8px;padding:8px 10px;font:inherit;cursor:pointer`;b.onclick=e=>{e.stopPropagation();SND.ctx&&SND.ctx.resume();fn()};bar.appendChild(b);return b};
+  btn("♥ กดหัวใจ x5",()=>like(me,5),"#c0394b");
+  for(let i=1;i<=9;i++)btn(String(i),()=>comment(me,String(i)),"#4a7a3a");
+  btn("พิมพ์ข้อความ",()=>{const t=prompt("ข้อความ","สู้ๆ");if(t)comment(me,t)});
+  btn("กุหลาบ 1",()=>gift(me,1,"5655"),"#8a5a2a");btn("โดนัท 30",()=>gift(me,30,"5879"),"#8a5a2a");btn("มือหัวใจ 100",()=>gift(me,100,"5660"),"#8a5a2a");btn("คอร์กี้ 299",()=>gift(me,299,"6267"),"#8a5a2a");
+  btn("กดติดตาม",()=>{followDone.delete(me);follow(me)},"#c0394b");
+  btn("เหตุการณ์สุ่ม",()=>event());
+  let crowd=false;const cb=btn("คนดูจำลอง: ปิด",()=>{crowd=!crowd;cb.textContent="คนดูจำลอง: "+(crowd?"เปิด":"ปิด")});
+  window.__crowd=()=>crowd;document.body.appendChild(bar);
+  // คลิกบนจอเกม = กดหัวใจ 1 ครั้ง  ปุ่มคีย์บอร์ด 1-9 = พิมพ์เลข  H = หัวใจ
+  cv.addEventListener("pointerdown",()=>like(me,1));
+  addEventListener("keydown",e=>{if(/^[1-9]$/.test(e.key))comment(me,e.key);else if(e.key==="h"||e.key==="ห")like(me,5)})}
 
 // ---------- ข้อมูลจริงจาก server.js ----------
 const ids={},used={};
