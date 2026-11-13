@@ -131,7 +131,7 @@ function collect(k,x,y,p){const L=LOOT[k],mul=goldRush>NOW?2:1,pts=L.pts*mul;
   sfx(k==='chest'?'gift3':k==='relic'||k==='fossil'?'gift2':'gift1',k==='coin'?0.5:0.8);
   if(k==='chest'){shake=Math.max(shake,14);for(let i=0;i<24;i++)fx.push({type:'spark',x,y,vx:rnd(-380,380),vy:rnd(-520,-100),c:pick(['#ffd04a','#fff3b0','#f0a040']),t:NOW,life:0.9})}}
 // ระเบิด: แตกบล็อกตามพื้นที่ สมบัติเป็นของคนส่ง
-function blast(rs,cs,p){let n=0;rs.forEach(r=>cs.forEach(c=>{const b=row(r)[c];if(b.chestPart){if(bigChest&&!p.bot&&!b.bl){b.bl=1;setTimeout(()=>b.bl=0,50);hitChest(p,blockHp(r)*3)}}else if(b.hp>0){breakBlock(r,c,p,n++>4);}}));
+function blast(rs,cs,p){let n=0;rs.forEach(r=>cs.forEach(c=>{const b=row(r)[c];if(b.chestPart){if(bigChest&&p&&!p.bot&&!b.bl){b.bl=1;setTimeout(()=>b.bl=0,50);hitChest(p,blockHp(r)*3)}}else if(b.hp>0){breakBlock(r,c,p,n++>4);}}));
   const xs=cs.map(c=>c*BS+BS/2),ys=rs.map(r=>rowTop(r)+BS/2),cx=(Math.min(...xs)+Math.max(...xs))/2,cy=(Math.min(...ys)+Math.max(...ys))/2;
   fx.push({type:'boom',x:cx,y:cy,r:Math.max(140,(Math.max(...xs)-Math.min(...xs))*0.6),t:NOW,life:0.5});shake=Math.max(shake,18+rs.length*3);sfx('grenade')}
 
@@ -261,7 +261,7 @@ sndInit();
 // ---------- update ----------
 function update(dt){
   musicTick();updCine();
-  pending=pending.filter(e=>{if(NOW>=e.t){e.fn();return false}return true});
+  {const due=pending.filter(e=>NOW>=e.t);pending=pending.filter(e=>NOW<e.t);due.forEach(e=>{try{e.fn()}catch(err){console.error("pending",err)}})}
   const act=active(),workers=act.length?act:[];
   // บอทขุดช้าๆ ให้จอขยับตลอด คนน้อยบอทช่วยมากหน่อย
   if(DEMO||live.state==='live')BOT.q+=dt*(act.length?0.6:1.6);BOT.last=NOW;
