@@ -20,7 +20,7 @@ const ease={out:k=>1-(1-k)*(1-k),back:k=>{const c=1.7;k-=1;return 1+k*k*((c+1)*k
 let NOW=0,live={state:DEMO?'demo':'connecting'};
 // วัดจากจอมือถือจริง: แถบบนของ TikTok กิน 0-65 คอมเมนต์ล่างซ้ายกิน 1400 ลงไป
 const SAFE_T=72,SAFE_B=1390;
-const COLS=9,BS=120,FRONT_Y=820,ZLEN=20,IDLE=25;
+const COLS=9,BS=120,FRONT_Y=900,ZLEN=20,IDLE=25;
 
 // ---------- ชั้นดิน: ทุก 20 เมตรเปลี่ยนฉาก ----------
 const ZONES=[
@@ -312,7 +312,7 @@ function render(){
       const dmg=1-b.hp/b.max;if(dmg>0.15&&!b.chestPart)g.drawImage(CRACK[dmg>0.66?2:dmg>0.4?1:0],x+jit,y,BS,BS);
       if(b.loot&&r<=front+5){const tw=0.5+0.5*Math.sin(NOW*3+c*1.7+r);g.globalAlpha=0.35+0.4*tw;icon(b.loot,x+BS/2,y+BS/2,b.loot==='chest'?54:40);g.globalAlpha=1;
         const s=4+5*tw;g.fillStyle='#fff8d0';g.fillRect(x+BS*0.7-s,y+BS*0.28-1.5,s*2,3);g.fillRect(x+BS*0.7-1.5,y+BS*0.28-s,3,s*2)}
-      if(r===front&&!b.chestPart){g.globalAlpha=0.75;txt(`${c+1}`,x+BS/2,y+BS-14,30,'#fff','center',700);g.globalAlpha=1}});
+      if(r===digRow(c)&&!b.chestPart){g.fillStyle='rgba(14,16,20,.75)';g.beginPath();g.roundRect(x+BS/2-26,y+BS-62,52,52,12);g.fill();txt(`${c+1}`,x+BS/2,y+BS-20,40,'#9fe08a','center',700)}});
     if(r>front+4){const k=Math.min(0.6,(r-front-4)*0.15);g.fillStyle=`rgba(0,0,0,${k})`;g.fillRect(0,y,W,BS)}
     if(zr!==zoneOf(r-1)&&r>0){g.fillStyle='rgba(255,208,74,.9)';g.fillRect(0,y-3,W,6);const zi=zoneInfo(zr);txt(`${r} ม. : ${zi.n}`,20,y+40,26,'#ffd04a','left',700)}}
   // หีบยักษ์
@@ -336,41 +336,47 @@ function render(){
     else if(f.type==='drill'){const y=rowTop(front)-120+k*260,x=540;g.globalAlpha=Math.min(1,(f.life-t)/0.3);g.fillStyle='#8a8f96';g.fillRect(x-70,y-200,140,170);g.fillStyle='#c9ccd1';
       g.beginPath();g.moveTo(x-70,y-30);g.lineTo(x+70,y-30);g.lineTo(x,y+90);g.fill();g.strokeStyle='#5a5f66';g.lineWidth=6;for(let i=0;i<4;i++){const o=((NOW*240+i*30)%120);g.beginPath();g.moveTo(x-70+o*0.58,y-30+o);g.lineTo(x+70-o*0.58,y-30+o+14);g.stroke()}g.globalAlpha=1}});
   // สมบัติที่ลอยขึ้นแล้วบินเข้าแถบอันดับ
-  flyers.forEach(f=>{const k=(NOW-f.t)/1.4;if(k<0)return;const up=Math.min(1,k/0.35),fl=Math.max(0,(k-0.45)/0.55),tx=540,ty=SAFE_T+318;
+  flyers.forEach(f=>{const k=(NOW-f.t)/1.4;if(k<0)return;const up=Math.min(1,k/0.35),fl=Math.max(0,(k-0.45)/0.55),tx=540,ty=SAFE_T+438;
     const x=f.x+(tx-f.x)*ease.in(fl),y=f.y-80*ease.out(up)+(ty-(f.y-80))*ease.in(fl),s=(f.k==='chest'?90:64)*(0.5+0.5*ease.back(up))*(1-fl*0.6);
     glow(x,y,s,'rgba(255,230,150,1)',0.4*(1-fl));icon(f.k,x,y,s)});
   pops.forEach(p=>{const k=(NOW-p.t)/1.4;g.globalAlpha=1-k*k;const y=p.y-k*70;if(p.img){drawImg(p.img,p.x,y-40,70);txt(p.s,p.x,y+24,26,p.col,'center')}else txt(p.s,p.x,y,p.size,p.col,'center');g.globalAlpha=1});
   g.setTransform(1,0,0,1,0,0);
   if(NOW-zoneFlash<0.6){g.fillStyle=`rgba(255,240,200,${0.5*(1-(NOW-zoneFlash)/0.6)})`;g.fillRect(0,0,W,H)}
-  if(goldRush>NOW){g.strokeStyle=`rgba(159,224,138,${0.5+0.3*Math.sin(NOW*8)})`;g.lineWidth=14;g.strokeRect(7,SAFE_T+372,W-14,SAFE_B-SAFE_T-372)}
+  if(goldRush>NOW){g.strokeStyle=`rgba(159,224,138,${0.5+0.3*Math.sin(NOW*8)})`;g.lineWidth=14;g.strokeRect(7,SAFE_T+450,W-14,SAFE_B-SAFE_T-450)}
   hud();
   const bn=banners.find(b=>NOW>=b.t&&NOW<b.t+2.4);banners=banners.filter(b=>NOW<b.t+2.4);
-  if(bn&&!cine.cur){const k=ease.back(Math.min(1,(NOW-bn.t)/0.3));g.save();g.translate(540,560);g.scale(k,k);g.translate(-540,-560);panel(70,490,940,bn.sub?150:100,bn.col,0.9);txt(bn.s,540,556,48,bn.col,'center');if(bn.sub)txt(bn.sub,540,612,30,'#fff','center',500);g.restore()}
+  if(bn&&!cine.cur){const k=ease.back(Math.min(1,(NOW-bn.t)/0.3));g.save();g.translate(540,640);g.scale(k,k);g.translate(-540,-640);panel(70,570,940,bn.sub?150:100,bn.col,0.9);txt(bn.s,540,636,48,bn.col,'center');if(bn.sub)txt(bn.sub,540,692,30,'#fff','center',500);g.restore()}
   if(!active().length&&!cine.cur){const k=0.75+0.25*Math.sin(NOW*4);g.globalAlpha=k;panel(140,1200,800,150,'#f0c86a');txt('กดหัวใจ เพื่อช่วยขุด!',540,1268,48,'#f0c86a','center');txt('ข้างล่างมีสมบัติรออยู่',540,1324,30,'#fff','center',500);g.globalAlpha=1}
   drawCine();
   if(SND.ctx&&SND.ctx.state!=='running'){g.fillStyle='rgba(14,16,20,.85)';g.beginPath();g.roundRect(290,1846,500,52,26);g.fill();txt('คลิกจอ 1 ครั้ง เพื่อเปิดเสียง',540,1882,28,'#f0c86a','center',600)}
   if(SHOWSAFE){g.fillStyle='rgba(255,0,0,.25)';g.fillRect(0,0,W,SAFE_T);g.fillRect(0,SAFE_B,W,H-SAFE_B)}
 }
 function hud(){
-  // แถวบน: ความลึก ชั้น สถิติ
-  panel(16,SAFE_T,1048,104,'#ffffff');
-  txt('ลึก',36,SAFE_T+44,24,'#cfcfcf','left',500);txt(`${front} ม.`,36,SAFE_T+90,44,'#f0c86a');
-  const zi=zoneInfo(zoneOf(front)),pr=(front%ZLEN)/ZLEN;txt(zi.n,540,SAFE_T+40,30,'#fff','center');
-  g.fillStyle='#222';g.fillRect(300,SAFE_T+58,480,24);g.fillStyle='#e8a050';g.fillRect(302,SAFE_T+60,476*pr,20);txt(`อีก ${ZLEN-front%ZLEN} ม. ถึงชั้นต่อไป`,540,SAFE_T+80,18,'#fff','center',600);
-  txt('สถิติ',1044,SAFE_T+44,24,'#cfcfcf','right',500);txt(record?`${Math.max(record,recordBroken?front:0)} ม.`:'-',1044,SAFE_T+90,40,'#ffd04a','right');
-  // วิธีเล่น
-  const y0=SAFE_T+112;panel(16,y0,1048,140,'#e8a050');
-  heart(44,y0+24,22);txt('กดหัวใจ = ขุด',64,y0+33,26,'#fff','left',700);txt('พิมพ์ 1-9 = เลือกช่อง',540,y0+33,26,'#9fe08a','center',700);txt('ขุดแตก = ได้สมบัติ',1044,y0+33,26,'#f0c86a','right',700);
-  TIERS.forEach((tr,i)=>{const cx=140+i*266;drawImg(GIMG[tr.id],cx-70,y0+90,52);txt(tr.n,cx-36,y0+82,24,'#f0c86a','left',700);txt(tr.d,cx-36,y0+110,18,'#d8d8d8','left',500);txt(`${tr.c} เหรียญ`,cx-36,y0+132,16,'#aaa','left',500)});
-  panel(16,SAFE_T+258,1048,36,'#f0c86a',0.8);txt('หัวใจสะสม = จอบแรงขึ้น',36,SAFE_T+284,20,'#fff','left',600);txt('กดติดตาม = ระเบิดฟรี 1 ลูก',1044,SAFE_T+284,20,'#f0c86a','right',600);
+  // แถบบนบาง: ความลึก ชั้น สถิติ
+  panel(16,SAFE_T,1048,72,'#ffffff');
+  txt(`ลึก ${front} ม.`,36,SAFE_T+48,34,'#f0c86a');
+  const zi=zoneInfo(zoneOf(front)),pr=(front%ZLEN)/ZLEN;txt(zi.n,540,SAFE_T+32,24,'#fff','center',600);
+  g.fillStyle='#222';g.fillRect(380,SAFE_T+42,320,16);g.fillStyle='#e8a050';g.fillRect(382,SAFE_T+44,316*pr,12);
+  txt(`สถิติ ${record?Math.max(record,recordBroken?front:0)+' ม.':'-'}`,1044,SAFE_T+48,30,'#ffd04a','right');
+  // วิธีเล่น ตัวใหญ่ 3 บรรทัด
+  const y0=SAFE_T+80;panel(16,y0,1048,208,'#f0c86a',0.88);
+  const step=(i,draw,a,b)=>{const y=y0+52+i*62;draw(78,y-12);txt(a,130,y,40,'#fff','left',700);g.font=`700 40px ${FONT}`;const w=g.measureText(a).width;txt(b,130+w+14,y,40,'#f0c86a','left',700)};
+  step(0,(x,y)=>heart(x,y+2,40),'กดหัวใจ','= ขุดดิน');
+  step(1,(x,y)=>{g.fillStyle='#9fe08a';g.beginPath();g.roundRect(x-40,y-24,80,48,12);g.fill();txt('1-9',x,y+12,28,'#14200c','center',700,'#9fe08a')},'พิมพ์เลข 1-9','= เลือกช่องขุด');
+  step(2,(x,y)=>icon('chest',x,y,64),'ขุดแตก','= ได้สมบัติ');
+  // ของขวัญ + ติดตาม
+  const y1=y0+216;panel(16,y1,1048,104,'#e8a050',0.85);
+  const cells=[...TIERS.map(t=>({im:GIMG[t.id],n:t.n,s:`${t.c} เหรียญ`})),{im:null,n:'ระเบิดฟรี',s:'กดติดตาม'}];
+  cells.forEach((c,i)=>{const cx=16+104+i*209;if(c.im)drawImg(c.im,cx,y1+36,54);else{g.fillStyle='#e5566b';g.beginPath();g.roundRect(cx-40,y1+14,80,44,12);g.fill();txt('+ติดตาม',cx,y1+44,20,'#fff','center',700,'#e5566b')}
+    txt(c.n,cx,y1+82,24,'#f0c86a','center',700);txt(c.s,cx,y1+100,16,'#bbb','center',500)});
   // Top 3 นักขุด
-  const top=Object.values(P).filter(p=>p.pts>0).sort((a,b)=>b.pts-a.pts).slice(0,3);
-  panel(16,SAFE_T+300,1048,44,'#ffd04a',0.82);txt('TOP',36,SAFE_T+332,22,'#ffd04a','left',700);
-  if(!top.length)txt('ยังไม่มีใครเจอสมบัติ ขุดเป็นคนแรกเลย!',560,SAFE_T+331,22,'#cfcfcf','center',500);
-  top.forEach((p,i)=>{const x=100+i*322,cc=['#e8c547','#d0d6dc','#c98a52'][i];txt(`${i+1}`,x,SAFE_T+332,24,cc,'center');avatar(p,x+32,SAFE_T+322,14,cc);
-    txt(short(p.name,9),x+54,SAFE_T+331,22,'#fff','left',600);txt(p.pts.toLocaleString(),x+300,SAFE_T+331,22,'#f0c86a','right',700)});
-  if(!DEMO&&live.state!=='live')txt({connecting:'กำลังต่อไลฟ์...',offline:'รอไลฟ์เริ่ม...',error:'ต่อไลฟ์ไม่ได้',server:'ไม่เจอ server.js'}[live.state]||'',540,SAFE_T+380,24,'#e09a4a','center',500);
-  if(goldRush>NOW)txt(`สมบัติ x2 อีก ${Math.ceil(goldRush-NOW)} วิ`,540,SAFE_T+386,28,'#9fe08a','center',700)}
+  const y2=y1+112,top=Object.values(P).filter(p=>p.pts>0).sort((a,b)=>b.pts-a.pts).slice(0,3);
+  panel(16,y2,1048,46,'#ffd04a',0.82);txt('TOP',36,y2+33,22,'#ffd04a','left',700);
+  if(!top.length)txt('ยังไม่มีใครเจอสมบัติ ขุดเป็นคนแรกเลย!',560,y2+32,22,'#cfcfcf','center',500);
+  top.forEach((p,i)=>{const x=100+i*322,cc=['#e8c547','#d0d6dc','#c98a52'][i];txt(`${i+1}`,x,y2+33,24,cc,'center');avatar(p,x+32,y2+23,14,cc);
+    txt(short(p.name,9),x+54,y2+32,22,'#fff','left',600);txt(p.pts.toLocaleString(),x+300,y2+32,22,'#f0c86a','right',700)});
+  if(!DEMO&&live.state!=='live')txt({connecting:'กำลังต่อไลฟ์...',offline:'รอไลฟ์เริ่ม...',error:'ต่อไลฟ์ไม่ได้',server:'ไม่เจอ server.js'}[live.state]||'',540,y2+84,24,'#e09a4a','center',500);
+  if(goldRush>NOW)txt(`สมบัติ x2 อีก ${Math.ceil(goldRush-NOW)} วิ`,540,y2+86,30,'#9fe08a','center',700)}
 function drawCine(){const c=cine.cur;if(!c)return;
   if(c.honor&&NOW-c.t0<HON){const k=(NOW-c.t0)/HON,a=Math.max(0,Math.min(1,k*5,(1-k)*4)),px=c.p.x,py=rowTop(digRow(c.p.wc))-90;
     const vg=g.createRadialGradient(px,py,110,px,py,560);vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,`rgba(0,0,0,${0.78*a})`);g.fillStyle=vg;g.fillRect(0,0,W,H);
