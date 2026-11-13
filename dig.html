@@ -20,7 +20,7 @@ const ease={out:k=>1-(1-k)*(1-k),back:k=>{const c=1.7;k-=1;return 1+k*k*((c+1)*k
 let NOW=0,live={state:DEMO?'demo':'connecting'};
 // วัดจากจอมือถือจริง: แถบบนของ TikTok กิน 0-65 คอมเมนต์ล่างซ้ายกิน 1400 ลงไป
 const SAFE_T=72,SAFE_B=1390;
-const COLS=9,BS=120,FRONT_Y=940,ZLEN=20,IDLE=25;
+const COLS=9,BS=120,FRONT_Y=1000,ZLEN=20,IDLE=25;
 
 // ---------- ชั้นดิน: ทุก 20 เมตรเปลี่ยนฉาก ----------
 const ZONES=[
@@ -346,7 +346,7 @@ function render(){
   // คนงาน
   const ws=[...active(),BOT].sort((a,b)=>a.slot-b.slot),rank={},seen={};ws.forEach(p=>{rank[p.name]=seen[p.wc]=(seen[p.wc]??-1)+1});
   ws.forEach(p=>{miner(p,p.x,rowTop(digRow(p.wc)))});
-  ws.forEach(p=>{const r=digRow(p.wc),y=rowTop(r)-150-rank[p.name]*28;if(!p.bot){txt(short(p.name,8)+(p.lv>1?` ${PICK[p.lv-1].n.replace('จอบ','')}`:''),p.x,y-6,20,p.lv>=4?'#ffd04a':'#fff','center',600);
+  const king=Object.values(P).filter(q=>q.pts>0).sort((a,b)=>b.pts-a.pts)[0];ws.forEach(p=>{const r=digRow(p.wc),y=rowTop(r)-150-rank[p.name]*28;if(!p.bot){if(p===king)crown(p.x,y-30,16);txt(short(p.name,8)+(p.lv>1?` ${PICK[p.lv-1].n.replace('จอบ','')}`:''),p.x,y-6,20,p.lv>=4?'#ffd04a':'#fff','center',600);
     if(p.say&&NOW-p.sayT<3)bubble(p.say,p.x,y-32)}else txt('บอท',p.x,y-6,18,'#bbb','center',500)});
   // ไฟฉายจากหมวก
   ws.forEach(p=>glow(p.x,rowTop(digRow(p.wc))+30,150,'rgba(255,240,190,1)',0.18));
@@ -360,21 +360,22 @@ function render(){
     else if(f.type==='drill'){const y=rowTop(front)-120+k*260,x=540;g.globalAlpha=Math.min(1,(f.life-t)/0.3);g.fillStyle='#8a8f96';g.fillRect(x-70,y-200,140,170);g.fillStyle='#c9ccd1';
       g.beginPath();g.moveTo(x-70,y-30);g.lineTo(x+70,y-30);g.lineTo(x,y+90);g.fill();g.strokeStyle='#5a5f66';g.lineWidth=6;for(let i=0;i<4;i++){const o=((NOW*240+i*30)%120);g.beginPath();g.moveTo(x-70+o*0.58,y-30+o);g.lineTo(x+70-o*0.58,y-30+o+14);g.stroke()}g.globalAlpha=1}});
   // สมบัติที่ลอยขึ้นแล้วบินเข้าแถบอันดับ
-  flyers.forEach(f=>{const k=(NOW-f.t)/1.4;if(k<0)return;const up=Math.min(1,k/0.35),fl=Math.max(0,(k-0.45)/0.55),tx=540,ty=SAFE_T+438;
+  flyers.forEach(f=>{const k=(NOW-f.t)/1.4;if(k<0)return;const up=Math.min(1,k/0.35),fl=Math.max(0,(k-0.45)/0.55),tx=540,ty=SAFE_T+464;
     const x=f.x+(tx-f.x)*ease.in(fl),y=f.y-80*ease.out(up)+(ty-(f.y-80))*ease.in(fl),s=(f.k==='chest'?90:64)*(0.5+0.5*ease.back(up))*(1-fl*0.6);
     glow(x,y,s,'rgba(255,230,150,1)',0.4*(1-fl));icon(f.k,x,y,s)});
   pops.forEach(p=>{const k=(NOW-p.t)/1.4;g.globalAlpha=1-k*k;const y=p.y-k*70;if(p.img){drawImg(p.img,p.x,y-40,70);txt(p.s,p.x,y+24,26,p.col,'center')}else txt(p.s,p.x,y,p.size,p.col,'center');g.globalAlpha=1});
   g.setTransform(1,0,0,1,0,0);
   if(NOW-zoneFlash<0.6){g.fillStyle=`rgba(255,240,200,${0.5*(1-(NOW-zoneFlash)/0.6)})`;g.fillRect(0,0,W,H)}
-  if(goldRush>NOW){g.strokeStyle=`rgba(159,224,138,${0.5+0.3*Math.sin(NOW*8)})`;g.lineWidth=14;g.strokeRect(7,SAFE_T+516,W-14,SAFE_B-SAFE_T-516)}
+  if(goldRush>NOW){g.strokeStyle=`rgba(159,224,138,${0.5+0.3*Math.sin(NOW*8)})`;g.lineWidth=14;g.strokeRect(7,SAFE_T+582,W-14,SAFE_B-SAFE_T-582)}
   hud();
   const bn=banners.find(b=>NOW>=b.t&&NOW<b.t+2.4);banners=banners.filter(b=>NOW<b.t+2.4);
-  if(bn&&!cine.cur){const k=ease.back(Math.min(1,(NOW-bn.t)/0.3));g.save();g.translate(540,640);g.scale(k,k);g.translate(-540,-640);panel(70,570,940,bn.sub?150:100,bn.col,0.9);txt(bn.s,540,636,48,bn.col,'center');if(bn.sub)txt(bn.sub,540,692,30,'#fff','center',500);g.restore()}
+  if(bn&&!cine.cur){const k=ease.back(Math.min(1,(NOW-bn.t)/0.3));g.save();g.translate(540,820);g.scale(k,k);g.translate(-540,-820);panel(70,750,940,bn.sub?150:100,bn.col,0.9);txt(bn.s,540,816,48,bn.col,'center');if(bn.sub)txt(bn.sub,540,872,30,'#fff','center',500);g.restore()}
   if(!active().length&&!cine.cur){const k=0.75+0.25*Math.sin(NOW*4);g.globalAlpha=k;panel(140,1200,800,150,'#f0c86a');txt('กดหัวใจ เพื่อช่วยขุด!',540,1268,48,'#f0c86a','center');txt('ข้างล่างมีสมบัติรออยู่',540,1324,30,'#fff','center',500);g.globalAlpha=1}
   drawCine();
   if(SND.ctx&&SND.ctx.state!=='running'){g.fillStyle='rgba(14,16,20,.85)';g.beginPath();g.roundRect(290,1846,500,52,26);g.fill();txt('คลิกจอ 1 ครั้ง เพื่อเปิดเสียง',540,1882,28,'#f0c86a','center',600)}
   if(SHOWSAFE){g.fillStyle='rgba(255,0,0,.25)';g.fillRect(0,0,W,SAFE_T);g.fillRect(0,SAFE_B,W,H-SAFE_B)}
 }
+function crown(x,y,s){g.fillStyle="#e8c547";g.beginPath();g.moveTo(x-s,y);g.lineTo(x-s,y-s*0.9);g.lineTo(x-s*0.5,y-s*0.45);g.lineTo(x,y-s*1.1);g.lineTo(x+s*0.5,y-s*0.45);g.lineTo(x+s,y-s*0.9);g.lineTo(x+s,y);g.fill();g.fillStyle="#c0392b";g.beginPath();g.arc(x,y-s*0.35,s*0.16,0,7);g.fill()}
 function hud(){
   // แถบบนบาง: ความลึก ชั้น สถิติ
   panel(16,SAFE_T,1048,72,'#ffffff');
@@ -395,13 +396,14 @@ function hud(){
     txt(c.n,cx,y1+82,24,'#f0c86a','center',700);txt(c.s,cx,y1+100,16,'#bbb','center',500)});
   // Top 3 นักขุด
   const y2=y1+112,top=Object.values(P).filter(p=>p.pts>0).sort((a,b)=>b.pts-a.pts).slice(0,3);
-  panel(16,y2,1048,46,'#ffd04a',0.82);txt('TOP',36,y2+33,22,'#ffd04a','left',700);
-  if(!top.length)txt('ยังไม่มีใครเจอสมบัติ ขุดเป็นคนแรกเลย!',560,y2+32,22,'#cfcfcf','center',500);
-  top.forEach((p,i)=>{const x=100+i*322,cc=['#e8c547','#d0d6dc','#c98a52'][i];txt(`${i+1}`,x,y2+33,24,cc,'center');avatar(p,x+32,y2+23,14,cc);
-    txt(short(p.name,9),x+54,y2+32,22,'#fff','left',600);txt(p.pts.toLocaleString(),x+300,y2+32,22,'#f0c86a','right',700)});
-  drawMs(y2+54);
-  if(!DEMO&&live.state!=='live')txt({connecting:'กำลังต่อไลฟ์...',offline:'รอไลฟ์เริ่ม...',error:'ต่อไลฟ์ไม่ได้',server:'ไม่เจอ server.js'}[live.state]||'',540,y2+144,24,'#e09a4a','center',500);
-  if(goldRush>NOW)txt(`สมบัติ x2 อีก ${Math.ceil(goldRush-NOW)} วิ`,540,y2+146,30,'#9fe08a','center',700)}
+  if(!top.length){panel(16,y2,1048,112,"#ffd04a",0.85);txt("TOP นักขุด",540,y2+44,28,"#ffd04a","center",700);txt("ยังไม่มีใครเจอสมบัติ ขุดเป็นคนแรกเลย!",540,y2+88,30,"#fff","center",600)}
+  top.forEach((p,i)=>{const x0=16+i*352,cc=["#e8c547","#d0d6dc","#c98a52"][i];panel(x0,y2,344,112,cc,0.88);if(i===0)glow(x0+96,y2+56,90,"rgba(255,220,120,1)",0.25);
+    g.fillStyle=cc;g.beginPath();g.arc(x0+30,y2+56,20,0,7);g.fill();txt(`${i+1}`,x0+30,y2+67,28,"#1a1408","center",700,cc);
+    avatar(p,x0+94,y2+58,34,cc);if(i===0)crown(x0+94,y2+22,20);
+    txt(short(p.name,8),x0+140,y2+50,28,"#fff","left",700);icon("coin",x0+154,y2+82,24);txt(p.pts.toLocaleString(),x0+174,y2+92,28,"#f0c86a","left",700)});
+  drawMs(y2+120);
+  if(!DEMO&&live.state!=='live')txt({connecting:'กำลังต่อไลฟ์...',offline:'รอไลฟ์เริ่ม...',error:'ต่อไลฟ์ไม่ได้',server:'ไม่เจอ server.js'}[live.state]||'',540,y2+212,24,'#e09a4a','center',500);
+  if(goldRush>NOW)txt(`สมบัติ x2 อีก ${Math.ceil(goldRush-NOW)} วิ`,540,y2+214,30,'#9fe08a','center',700)}
 function drawCine(){const c=cine.cur;if(!c)return;
   if(c.honor&&NOW-c.t0<HON){const k=(NOW-c.t0)/HON,a=Math.max(0,Math.min(1,k*5,(1-k)*4)),px=c.p.x,py=rowTop(digRow(c.p.wc))-90;
     const vg=g.createRadialGradient(px,py,110,px,py,560);vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,`rgba(0,0,0,${0.78*a})`);g.fillStyle=vg;g.fillRect(0,0,W,H);
