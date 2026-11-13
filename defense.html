@@ -16,8 +16,8 @@ const W=1080,H=1920,PX=4,FONT='Kanit, Tahoma, sans-serif';
 const rnd=(a,b)=>a+Math.random()*(b-a),pick=a=>a[Math.random()*a.length|0],clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const short=(s,n=8)=>s.length>n?s.slice(0,n)+'…':s;
 let NOW=0;
-// แถบบนของ TikTok กินราว 0-200 แถบล่างราว 1620-1920 ข้อมูลสำคัญอยู่ระหว่างนี้เท่านั้น
-const SAFE_T=200,SAFE_B=1620;
+// วัดจากจอมือถือจริง 13 พ.ย.: แถบบนของ TikTok กินราว 0-65 คอมเมนต์ล่างซ้ายกินราว 1400 ลงไป ข้อมูลสำคัญอยู่ระหว่างนี้
+const SAFE_T=72,SAFE_B=1390;
 const SPAWN_Y=480,WALL_TOP=1135,WALL_BOT=1225,STAND_Y=1158,HIT_Y=1118;
 const ROUND=90,IDLE=20,MAXWALL=1500,INTER=8,RANGE_H=700,RANGE_T=800;
 const SLOTS=[...Array(10)].map((_,i)=>150+i*87);
@@ -551,20 +551,28 @@ function render(){
   pops.forEach(p=>{const k=(NOW-p.t)/1.4;g.globalAlpha=1-k*k;const y=p.y-k*60;if(p.img){const s=88*(k<0.15?0.6+k*2.7:1);drawImg(p.img,p.x,y-40,s);txt(p.s,p.x,y+24,26,p.col,'center')}else txt(p.s,p.x,y,p.size,p.col,'center');g.globalAlpha=1});
   g.restore();
 
-  // ---- HUD บน (อยู่ใต้แถบของ TikTok) ----
-  panel(16,206,1048,170,'#ffffff');
+  // ---- HUD บน: กระชับ แถบเวลา+กำแพง แล้วตามด้วยวิธีเล่นสองฝั่ง (ล่างซ้ายเป็นคอมเมนต์ของ TikTok จึงไม่วางอะไรตรงนั้น) ----
+  panel(16,SAFE_T,1048,104,"#ffffff");
   const left=Math.max(0,Math.ceil(ROUND-(NOW-round.t0)));
-  txt(`รอบ ${round.n}`,44,262,40,'#fff');
-  txt(round.state==='play'?`เหลือ ${left} วิ`:'จบรอบ',540,266,50,left<=10&&round.state==='play'?'#ff6a6a':'#f0c86a','center');
-  txt(`คน ${score.h} : ${score.z} ซอมบี้`,1036,262,34,'#fff','right',600);
-  txt('กำแพง',44,328,32,'#fff');
-  const wv=round.wall/MAXWALL;g.fillStyle='#222';g.fillRect(160,298,860,40);g.fillStyle=wv<0.3?'#d9473b':wv<0.6?'#e09a4a':'#7fb85a';g.fillRect(164,302,852*wv,32);
-  txt(`${Math.ceil(round.wall)}`,590,330,28,'#fff','center',600);
-  txt(`ฝั่งคน ${activeOf('h').length} คน${lose.h?`  บัฟ +${Math.round((buff('h')-1)*100)}%`:''}`,44,368,28,COL.h,'left',600);txt(`${lose.z?`บัฟ +${Math.round((buff('z')-1)*100)}%  `:''}ฝั่งซอมบี้ ${activeOf('z').length} คน`,1036,368,28,COL.z,'right',600);
-  if(!DEMO&&live.state!=='live')txt({connecting:'กำลังต่อไลฟ์...',offline:'รอไลฟ์เริ่ม...',error:'ต่อไลฟ์ไม่ได้',server:'ไม่เจอ server.js'}[live.state]||'',540,368,26,'#e09a4a','center',500);
+  txt(`รอบ ${round.n}`,40,SAFE_T+42,30,"#fff");
+  txt(round.state==="play"?`เหลือ ${left} วิ`:"จบรอบ",540,SAFE_T+44,40,left<=10&&round.state==="play"?"#ff6a6a":"#f0c86a","center");
+  txt(`คน ${score.h} : ${score.z} ซอมบี้`,1040,SAFE_T+42,28,"#fff","right",600);
+  txt("กำแพง",40,SAFE_T+86,24,"#fff");
+  const wv=round.wall/MAXWALL;g.fillStyle="#222";g.fillRect(130,SAFE_T+64,904,28);g.fillStyle=wv<0.3?"#d9473b":wv<0.6?"#e09a4a":"#7fb85a";g.fillRect(133,SAFE_T+67,898*wv,22);
+  txt(`${Math.ceil(round.wall)}`,582,SAFE_T+87,22,"#fff","center",600);
+  [["h",16,"ฝั่งคน  พิมพ์ 1","ยิงรัว"],["z",544,"ซอมบี้  พิมพ์ 2","เรียกซอมบี้"]].forEach(([t,x0,title,tap])=>{const y0=SAFE_T+112;
+    panel(x0,y0,520,140,COL[t]);
+    const n=activeOf(t).length,bf=lose[t]?`  +${Math.round((buff(t)-1)*100)}%`:"";
+    txt(title,x0+18,y0+34,26,COL[t]);txt(`${n} คน${bf}`,x0+250,y0+34,20,"#cfcfcf","left",600);
+    heart(x0+396,y0+24,20);txt(tap,x0+504,y0+33,20,"#f0c86a","right",600);
+    TIERS.forEach((tr,i)=>{const cx=x0+66+i*128;drawImg(GIMG[tr.id],cx,y0+70,40);
+      txt(`${tr.c} เหรียญ`,cx,y0+104,16,"#bdbdbd","center",500);txt(tr[t],cx,y0+128,20,"#f0c86a","center",600)})});
+  panel(16,SAFE_T+258,1048,36,"#f0c86a",0.8);
+  heart(44,SAFE_T+276,18);txt("สะสมหัวใจ = เลเวลอัป ยิงแรงขึ้น",62,SAFE_T+284,20,"#fff","left",600);txt("กดติดตาม = ระเบิดฟรี 1 ลูก",1044,SAFE_T+284,20,"#f0c86a","right",600);
+  if(!DEMO&&live.state!=="live")txt({connecting:"กำลังต่อไลฟ์...",offline:"รอไลฟ์เริ่ม...",error:"ต่อไลฟ์ไม่ได้",server:"ไม่เจอ server.js"}[live.state]||"",540,SAFE_T+326,24,"#e09a4a","center",500);
 
   {const tags=[];if(fog>NOW)tags.push([`หมอกควัน ${Math.ceil(fog-NOW)} วิ`,'#b9c4a8']);if(frenzy>NOW)tags.push([`ฝูงคลั่ง ${Math.ceil(frenzy-NOW)} วิ`,'#e5566b']);
-    tags.forEach(([t,c],i)=>{const x=540+(i-(tags.length-1)/2)*250;g.fillStyle='rgba(14,16,20,.85)';g.beginPath();g.roundRect(x-115,388,230,44,22);g.fill();g.strokeStyle=c;g.lineWidth=3;g.stroke();txt(t,x,420,26,c,'center',700)})}
+    tags.forEach(([t,c],i)=>{const x=540+(i-(tags.length-1)/2)*250;g.fillStyle='rgba(14,16,20,.85)';g.beginPath();g.roundRect(x-115,SAFE_T+302,230,40,20);g.fill();g.strokeStyle=c;g.lineWidth=3;g.stroke();txt(t,x,SAFE_T+330,24,c,'center',700)})}
   if(round.state==='play'&&!activeOf('h').length&&!activeOf('z').length&&!cine.cur){const k=0.75+0.25*Math.sin(NOW*4);g.globalAlpha=k;
     panel(110,720,860,190,'#f0c86a');txt('กดหัวใจ เพื่อช่วยยิงซอมบี้!',540,800,50,'#f0c86a','center');txt('ป้อมกำลังจะแตก ไม่มีใครช่วยเลย',540,870,34,'#fff','center',500);g.globalAlpha=1}
   if(round.state==='end')drawResult();
@@ -580,15 +588,6 @@ function render(){
     top.forEach((p,i)=>{const y=1294+i*34;txt(`${i+1}`,x0+30,y+9,26,['#e8c547','#d0d6dc','#c98a52'][i],'center');
       avatar(p,x0+70,y,13,['#e8c547','#d0d6dc','#c98a52'][i]);txt(short(p.name,12),x0+94,y+9,24,'#fff','left',600);
       txt(`${val(p).toLocaleString()}`,x0+500,y+9,24,'#f0c86a','right',700)})});
-  // ---- วิธีเล่น (เหนือแถบคอมเมนต์ของ TikTok) ----
-  panel(16,1376,1048,48,'#f0c86a',0.8);
-  heart(52,1404,26);txt('สะสมหัวใจ = เลเวลอัป ตัวใหญ่ ยิงแรงขึ้น',76,1410,26,'#fff','left',600);txt('กดติดตาม = ระเบิดฟรี 1 ลูก',1044,1410,26,'#f0c86a','right',600);
-  panel(16,1430,520,186,COL.h);panel(544,1430,520,186,COL.z);
-  [['h',16,'ฝั่งคน  พิมพ์ 1','ยิงรัว'],['z',544,'ซอมบี้  พิมพ์ 2','เรียกซอมบี้']].forEach(([t,x0,title,tap])=>{
-    txt(title,x0+22,1476,34,COL[t]);heart(x0+330,1462,30);txt(tap,x0+498,1476,28,'#f0c86a','right',600);
-    TIERS.forEach((tr,i)=>{const cx=x0+70+i*126;drawImg(GIMG[tr.id],cx,1518,54);
-      txt(`${tr.c} เหรียญ`,cx,1570,20,'#d8d8d8','center',500);txt(tr[t],cx,1602,24,'#f0c86a','center',600)})});
-
   if(SND.ctx&&SND.ctx.state!=='running'){g.fillStyle='rgba(14,16,20,.85)';g.beginPath();g.roundRect(290,1846,500,52,26);g.fill();txt('คลิกจอ 1 ครั้ง เพื่อเปิดเสียง',540,1882,28,'#f0c86a','center',600)}
   if(SHOWSAFE){g.fillStyle='rgba(255,0,0,.25)';g.fillRect(0,0,W,SAFE_T);g.fillRect(0,SAFE_B,W,H-SAFE_B)}
 }
