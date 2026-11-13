@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>เลือกเสียงเกม</title>
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#14161b;--card:#1d2027;--line:#2c313b;--text:#e9e6df;--muted:#9aa0aa;--accent:#f0c86a}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 Kanit,Tahoma,sans-serif}
+main{max-width:760px;margin:0 auto;padding:24px 16px 80px}
+h1{font-size:26px;margin:0 0 4px}p.sub{color:var(--muted);margin:0 0 20px}
+.row{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:8px 0}
+.row .name{flex:1;min-width:0}.row .name b{display:block}.row .name small{color:var(--muted)}
+.opt{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:10px;padding:6px 10px;cursor:pointer}
+.opt.on{border-color:var(--accent);background:#2a2618}
+button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);background:#262a33;color:var(--text);padding:4px 10px}
+button.main{background:var(--accent);color:#1a1408;border:0;font-weight:600;padding:10px 20px}
+.bar{position:sticky;bottom:0;background:var(--bg);padding:12px 0;display:flex;gap:12px;align-items:center;border-top:1px solid var(--line)}
+input{font:inherit;background:#262a33;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px 10px}
+#msg{color:var(--accent)}
+</style></head><body><main>
+<h1>เลือกเสียงเกม ป้อมสุดท้าย</h1>
+<p class="sub">กดฟังแบบ a กับ b แล้วกดเลือกแบบที่ชอบ เสร็จแล้วกดบันทึก เกมจะใช้เสียงที่เลือกเมื่อรีเฟรชหน้าเกม</p>
+<div class="row"><div class="name"><b>ทดสอบเสียงอ่านชื่อ (ฟรีจาก Edge)</b><small>ชื่ออังกฤษแบบไทยจะแปลงเป็นไทยก่อนอ่าน คำที่ยังผิดเพิ่มใน name-fix.json</small></div>
+  <input id="nm" value="nongbeem"><button id="say">ฟัง</button></div>
+<div id="list"></div>
+<div class="bar"><button class="main" id="save">บันทึก</button><span id="msg"></span></div>
+</main>
+<script>
+const DESC={gun:['ยิงปืน','ทหารยิงทีละนัด'],mg:['ปืนกล','ตอนได้ปืนกล'],reload:['รีโหลด','เปลี่ยนซอง'],grenade:['ระเบิด','กุหลาบฝั่งคน และระเบิดทั่วไป'],
+  tank:['รถถัง','ของขวัญ 299 ฝั่งคน'],plane:['เครื่องบิน','ของขวัญ 100 ฝั่งคน'],zgroan:['ซอมบี้คำราม','ซอมบี้ของคนดูเกิด'],spit:['พ่นพิษ','ซอมบี้พ่นพิษกับบอส'],
+  wallhit:['ทุบกำแพง','ซอมบี้ถึงกำแพง'],fog:['หมอกควัน','กุหลาบฝั่งซอมบี้'],frenzy:['ฝูงคลั่ง','ของขวัญ 100 ฝั่งซอมบี้'],boss:['บอสคำราม','ของขวัญ 299 ฝั่งซอมบี้'],
+  gift1:['ของขวัญ ระดับ 1','กุหลาบ ต่ำกว่า 30 เหรียญ'],gift2:['ของขวัญ ระดับ 2','30-99 เหรียญ และกดติดตาม'],gift3:['ของขวัญ ระดับ 3','100-298 เหรียญ'],gift4:['ของขวัญ ระดับ 4','299 เหรียญขึ้นไป'],levelup:['เลเวลอัป',''],honor:['ไฟสปอตไลต์','ซูมให้เกียรติคนส่ง 100+'],win:['ฝั่งคนชนะ',''],lose:['ป้อมแตก',''],
+  bgm_battle:['เพลงรบ','เล่นวนตลอดรอบ'],bgm_boss:['เพลงบอส','ตอนมีบอสหรือฝูงคลั่ง'],
+  vo_soldier:['ประกาศพลทหารใหม่','ตามด้วยชื่อคน'],vo_zombie:['ประกาศซอมบี้ใหม่','ตามด้วยชื่อคน']};
+let choice={},list={};const audio=new Audio();
+function play(src){audio.pause();audio.src=src;audio.currentTime=0;audio.play()}
+fetch('/sounds').then(r=>r.json()).then(d=>{choice=d.choice;list=d.list;render()});
+function render(){const el=document.getElementById('list');el.innerHTML='';
+  Object.keys(DESC).filter(k=>list[k]).forEach(k=>{const r=document.createElement('div');r.className='row';
+    r.innerHTML=`<div class="name"><b>${DESC[k][0]}</b><small>${DESC[k][1]}</small></div>`;
+    list[k].forEach(v=>{const o=document.createElement('div');o.className='opt'+((choice[k]||'a')===v?' on':'');
+      o.innerHTML=`<button>▶ ${v}</button><span>เลือก</span>`;o.querySelector('button').onclick=e=>{e.stopPropagation();play(`/sfx/${k}_${v}.mp3`)};
+      o.onclick=()=>{choice[k]=v;render()};r.appendChild(o)});el.appendChild(r)})}
+document.getElementById('save').onclick=async()=>{const r=await fetch('/sounds',{method:'POST',body:JSON.stringify(choice)});
+  document.getElementById('msg').textContent=r.ok?'บันทึกแล้ว รีเฟรชหน้าเกมเพื่อใช้เสียงใหม่':'บันทึกไม่ได้'};
+document.getElementById('say').onclick=async()=>{const v=document.getElementById('nm').value;document.getElementById('msg').textContent='อ่านเป็น: '+(await (await fetch('/say-text?t='+encodeURIComponent(v))).text())+' (กำลังสร้างเสียง...)';
+  const a=new Audio('/say?v=niwat&n='+Date.now()+'&t='+encodeURIComponent(document.getElementById('nm').value));a.oncanplay=()=>{document.getElementById('msg').textContent=document.getElementById('msg').textContent.replace(' (กำลังสร้างเสียง...)','')};
+  a.onerror=()=>{document.getElementById('msg').textContent='บริการ Edge ไม่ตอบ ลองใหม่อีกครั้ง'};a.play().catch(()=>{})};
+</script></body></html>

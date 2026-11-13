@@ -1,0 +1,15 @@
+{
+  "name": "live-game",
+  "version": "0.1.0",
+  "private": true,
+  "description": "เกมร้านผีกะศุกร์13 สำหรับ TikTok LIVE: อ่านคอมเมนต์ ไลค์ ของขวัญ แล้วส่งเข้าหน้าเกม",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "msedge-tts": "2.1.1",
+    "tiktok-live-connector": "2.5.0",
+    "ws": "8.23.0"
+  }
+}

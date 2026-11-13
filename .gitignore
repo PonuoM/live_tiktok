@@ -1,0 +1,23 @@
+node_modules/
+tts-cache/
+followed.json
+*.tmp.mp3
+# คีย์ API จริงห้ามขึ้น repo (เครื่องใหม่ให้คัดลอก .env.example แล้วใส่คีย์เอง)
+.env
+**/.env
+# ไม่เอาภาพและวิดีโอขึ้น repo (ผู้ใช้สั่ง) ยกเว้นไอคอนของขวัญที่เกมใช้
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.svg
+*.ico
+*.bmp
+*.mp4
+*.mov
+*.webm
+*.mkv
+*.avi
+*.m4v
+!gifts/*.png
