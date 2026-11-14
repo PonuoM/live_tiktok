@@ -25,10 +25,10 @@ const CHOICE = path.join(DIR, 'sounds.json');
 fs.mkdirSync(TTS_DIR, { recursive: true });
 
 // บริการของ Edge ตัดการเชื่อมต่อกลางทางบ่อย จึงลองซ้ำได้ 3 ครั้ง ถ้ายังไม่ได้ก็ข้ามไป (เกมเล่นแค่ประโยคต้อนรับ)
-async function edgeOnce(text) {
+async function edgeOnce(text, prosody) {
   const tts = new MsEdgeTTS();
   await tts.setMetadata('th-TH-NiwatNeural', OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
-  const { audioStream } = tts.toStream(text);
+  const { audioStream } = tts.toStream(text, prosody);
   const parts = []; let ok = false;
   await new Promise(res => {
     audioStream.on('data', c => parts.push(c));
@@ -40,15 +40,14 @@ async function edgeOnce(text) {
   return ok && parts.length ? Buffer.concat(parts) : null;
 }
 const busy = new Map();
-export async function sayName(text) {
-  text = nameToThai(text).slice(0, 30);
-  if (!text) return null;
-  const file = path.join(TTS_DIR, crypto.createHash('md5').update(text).digest('hex') + '.mp3');
-  if (fs.existsSync(file) && fs.statSync(file).size > 0) return file;
+// สร้างเสียงพูดแล้วเก็บไว้ใน tts-cache ตามข้อความ ข้อความเดิมครั้งหน้าใช้ไฟล์เดิมทันที
+function synth(text, prefix = "", prosody) {
+  const file = path.join(TTS_DIR, prefix + crypto.createHash("md5").update(text).digest("hex") + ".mp3");
+  if (fs.existsSync(file) && fs.statSync(file).size > 0) return Promise.resolve(file);
   if (busy.has(file)) return busy.get(file);
   const job = (async () => {
     for (let i = 0; i < 3; i++) {
-      const b = await edgeOnce(text).catch(() => null);
+      const b = await edgeOnce(text, prosody).catch(() => null);
       if (b) { fs.writeFileSync(file, b); await normalize(file).catch(() => {}); return file; }
       await new Promise(r => setTimeout(r, 600));
     }
@@ -56,6 +55,19 @@ export async function sayName(text) {
   })().finally(() => busy.delete(file));
   busy.set(file, job);
   return job;
+}
+export async function sayName(text) {
+  text = nameToThai(text).slice(0, 30);
+  return text ? synth(text) : null;
+}
+// ประโยคของโฆษกงานวัด: t คือประโยคที่มี {n} แทนชื่อคน ชื่อถูกแปลงเป็นอักษรไทยก่อนอ่าน ถ้าแปลงแล้วไม่เหลือชื่อให้ใช้ประโยคสำรอง f
+// พูดเร็วและเสียงสูงกว่าปกติเล็กน้อยให้คึกคักแบบโฆษก (เอฟเฟกต์ลำโพงใส่ที่หน้าเกม)
+export async function sayLine(t, n, f) {
+  const name = n ? nameToThai(n).slice(0, 24) : "";
+  let text = String(t || "");
+  if (text.includes("{n}")) text = name ? text.split("{n}").join(name) : String(f || "");
+  text = text.replace(/\s+/g, " ").trim().slice(0, 160);
+  return text.length < 2 ? null : synth(text, "mc-", { rate: "+7%", pitch: "+3%" });
 }
 
 export function readChoice() { try { return JSON.parse(fs.readFileSync(CHOICE, 'utf8')); } catch { return {}; } }
@@ -84,6 +96,12 @@ export async function handleSound(req, res, url) {
   }
   if (url.pathname === '/say') {
     const f = await sayName(url.searchParams.get('t'));
+    if (!f) { send(404, 'text/plain', ''); return true; }
+    res.writeHead(200, { 'content-type': 'audio/mpeg', 'cache-control': 'no-cache' });
+    fs.createReadStream(f).pipe(res); return true;
+  }
+  if (url.pathname === '/mc') {
+    const q = url.searchParams, f = await sayLine(q.get('t'), q.get('n'), q.get('f'));
     if (!f) { send(404, 'text/plain', ''); return true; }
     res.writeHead(200, { 'content-type': 'audio/mpeg', 'cache-control': 'no-cache' });
     fs.createReadStream(f).pipe(res); return true;

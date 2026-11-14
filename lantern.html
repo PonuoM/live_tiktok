@@ -34,7 +34,7 @@ let NOW=0,live={state:DEMO?'demo':'connecting'};
 const renderer=new THREE.WebGLRenderer({canvas:document.getElementById('gl'),antialias:true});
 renderer.setPixelRatio(1);renderer.setSize(W,H,false);renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=0.85;
 const scene=new THREE.Scene();scene.fog=new THREE.FogExp2(0x2e2a5a,0.0065);
-const camera=new THREE.PerspectiveCamera(58,W/H,0.1,1200);camera.position.set(0,4.5,34);
+const camera=new THREE.PerspectiveCamera(58,W/H,0.1,1200);camera.position.set(0,4.5,34);camera.layers.enable(1);   // ชั้น 1 = ของที่ไม่วาดในเงาสะท้อนน้ำ
 const LOOK=new THREE.Vector3(0,9.5,-10);camera.lookAt(LOOK);
 const T={value:0};   // เวลาในเกม ใช้ร่วมกันทุก shader
 
@@ -163,7 +163,7 @@ const wheel=new THREE.Group();wheel.position.set(21,12.5,SHORE-15);scene.add(whe
   const sup=[];for(const sx of [-1,1])for(const dz of [-1.3,1.3])sup.push(part(new THREE.BoxGeometry(0.34,13.6,0.34),0x5a5a70,M4(21+sx*2.6,6.3,SHORE-15+dz,0,0,sx*0.39)));
   sup.push(part(new THREE.BoxGeometry(13,0.6,4.4),0x4a4458,M4(21,0.3,SHORE-15)));scene.add(solid(sup))}
 // วัดบนเนินด้านซ้ายเป็นฉากหลังไกลๆ: เจดีย์ทองกับวิหารหลังคาซ้อนชั้น (มีแต่ตัวอาคาร ไม่มีพระพุทธรูปหรือพระสงฆ์)
-{const tx=-27,tz=SHORE-44,by=6.2,gold=new THREE.MeshStandardMaterial({color:0xd8a848,roughness:.45,metalness:.3,emissive:0xb07018,emissiveIntensity:.75});
+{const tx=-4,tz=SHORE-44,by=6.2,gold=new THREE.MeshStandardMaterial({color:0xd8a848,roughness:.45,metalness:.3,emissive:0xb07018,emissiveIntensity:.75});
   const mound=new THREE.Mesh(new THREE.SphereGeometry(26,20,10,0,6.283,0,1.57),new THREE.MeshStandardMaterial({color:0x1c2430,roughness:1}));mound.scale.set(1.5,0.27,0.7);mound.position.set(tx+4,0,tz);scene.add(mound);
   const prof=[[4.4,0],[4.4,1.0],[3.7,1.0],[3.7,2.0],[3.0,2.0],[3.0,2.8],[2.6,3.2],[2.5,4.2],[2.2,5.6],[1.5,6.6],[0.9,7.0],[0.9,7.6],[0.6,7.9],[0.42,10],[0.2,12.5],[0.04,15]].map(([x,y])=>new THREE.Vector2(x,y));
   const chedi=new THREE.Mesh(new THREE.LatheGeometry(prof,20),gold);chedi.position.set(tx-5,by,tz);scene.add(chedi);
@@ -184,8 +184,8 @@ function palm(x,z,s,lean){const ps=[];for(let i=0;i<7;i++){const t=i/6;ps.push(p
   const tx=x+lean*2.2*s,ty=9.7*s,d=2.3*s;for(let i=0;i<9;i++){const a=i/9*6.283+0.2,dr=0.35+(i%3)*0.18;
     ps.push(part(new THREE.ConeGeometry(0.5*s,4.6*s,4),i%2?0x1f3a2c:0x274634,M4(tx+Math.cos(a)*Math.cos(dr)*d,ty-Math.sin(dr)*d,z+Math.sin(a)*Math.cos(dr)*d,0,-a,-(Math.PI/2+dr),0.3,1,1)))}
   for(let i=0;i<3;i++)ps.push(part(new THREE.SphereGeometry(0.3*s,6,5),0x4a3a22,M4(tx+rnd(-0.4,0.4)*s,ty-0.5*s,z+rnd(-0.4,0.4)*s)));scene.add(solid(ps,VCflat))}
-for(let i=0;i<11;i++){const x=-62+i*12+rnd(-3,3);if(x>-44&&x<-9)continue;tree(x,SHORE-19-rnd(0,8),rnd(1.1,1.9))}
-palm(-16,SHORE-15,1.25,-1);palm(5,SHORE-16,1.4,1);palm(-37,SHORE-14,1.1,1);palm(39,SHORE-15,1.3,-1);palm(-4,SHORE-27,1.5,-1);
+for(let i=0;i<11;i++){const x=-62+i*12+rnd(-3,3);if(x>-22&&x<14)continue;tree(x,SHORE-19-rnd(0,8),rnd(1.1,1.9))}
+palm(-23,SHORE-15,1.25,-1);palm(13,SHORE-16,1.3,1);palm(-37,SHORE-14,1.1,1);palm(39,SHORE-15,1.3,-1);
 
 // ---------- คนในงาน: ลำตัว หัว ผม รวมเป็นชิ้นเดียว แขนขาแยกชิ้นเพื่อแกว่งตอนเดิน บางคนถือลูกโป่ง สายไหม หรือโคมมือ ----------
 const SKIN=[0xe0b896,0xd9a982,0xc89870,0xb88a62],HAIRC=[0x1a1416,0x241a16,0x3a2a22],SHIRT=[0xd8584a,0x4a7ab8,0xe0b040,0x8a5ab0,0x4aa088,0xe08a3a,0xe8e4dc,0xe07aa0,0x5ab0d0,0x7ab04a],PANTS=[0x2a2a3c,0x3a3448,0x4a3a30,0x26303a,0x5a5560],SKIRT=[0x7a2a4a,0x2a4a7a,0x6a3a8a,0x8a5a2a,0x2a6a5a];
@@ -216,7 +216,7 @@ function makePerson(o={}){const g=new THREE.Group(),skirt=o.skirt??Math.random()
   g.scale.setScalar((o.kid?0.62:rnd(0.94,1.06))*1.75*(o.viewer?1.12:1));
   return {g,legL,legR,armL,armR,item,it}}
 const walkers=[];
-function addWalker(person,p,lead,off){const g=person.g;g.position.set(p?rnd(-19,19):rnd(-45,45),0,SHORE-rnd(1.4,5.6));scene.add(g);
+function addWalker(person,p,lead,off){const g=person.g;g.position.set(p?rnd(-6,19):rnd(-45,45),0,SHORE-rnd(1.4,5.6));g.traverse(o=>o.layers.set(1));scene.add(g);
   const w={...person,p,lead,off,dir:pick([-1,1]),sp:lead?lead.sp:p?rnd(1.5,2.4):rnd(1.1,2.2),stop:0,face:0,cheer:0,ph:rnd(0,9),s:g.scale.x};walkers.push(w);return w}
 // ฝูงคน: เดินเดี่ยว เดินคู่ และผู้ใหญ่จูงเด็ก
 for(let i=0;i<15;i++){const r=Math.random(),a=addWalker(makePerson());
@@ -227,7 +227,7 @@ function updWalkers(dt){for(let i=walkers.length-1;i>=0;i--){const w=walkers[i];
   for(const w of walkers){const g=w.g,L=w.lead;
     if(L){w.dir=L.dir;w.stop=L.stop;w.face=L.face;g.position.x+=(L.g.position.x-L.dir*0.25+w.off.x-g.position.x)*Math.min(1,dt*4);g.position.z=L.g.position.z+w.off.z}
     else if(w.stop>0)w.stop-=dt;
-    else{g.position.x+=w.dir*w.sp*dt;const lim=w.p?21:46;if(g.position.x>lim)w.dir=-1;if(g.position.x<-lim)w.dir=1;
+    else{g.position.x+=w.dir*w.sp*dt;if(g.position.x>(w.p?21:46))w.dir=-1;if(g.position.x<(w.p?-8:-46))w.dir=1;
       if(Math.random()<dt*0.06){w.stop=rnd(2,5);w.face=Math.random()<0.55?Math.PI:rnd(-0.3,0.3)}}   // หยุดดูร้าน หรือหันมามองโคมบนฟ้า
     if(w.cheer>0)w.cheer-=dt;
     const walking=w.stop<=0,f=2.2+w.sp*1.5,sw=walking?Math.sin(NOW*f+w.ph):0,k=Math.min(1,dt*10);
@@ -243,6 +243,49 @@ function walkerOf(p){if(!p||p.sample)return null;if(!p.walker)p.walker=addWalker
 const floatG=mergeGeometries([part(new THREE.ConeGeometry(0.62,0.16,10),0xd87a9c,M4(0,0.08,0,Math.PI,0,0)),part(new THREE.ConeGeometry(0.4,0.2,10),0xf0a8c4,M4(0,0.2,0,Math.PI,0,0)),part(new THREE.CylinderGeometry(0.1,0.1,0.2,6),0xfff0c0,M4(0,0.36,0))]);const floatM=new THREE.MeshBasicMaterial({vertexColors:true,color:0xb0b0b0});
 const floats=[];for(let i=0;i<14;i++){const g=new THREE.Group();g.add(new THREE.Mesh(floatG,floatM));const f=glowSprite(0xffc060,1.3,0.9);f.position.y=0.62;g.add(f);g.position.set(rnd(-24,24),0.05,rnd(-40,4));g.userData={ph:rnd(0,9),vx:rnd(-0.25,0.25),f};scene.add(g);floats.push(g)}
 const flies=[];for(let i=0;i<12;i++){const s=glowSprite(0xffe08a,rnd(.5,.9),.8);s.position.set(rnd(-25,25),rnd(.6,4),rnd(-36,8));s.userData={p:rnd(0,9),b:s.position.clone()};scene.add(s);flies.push(s)}
+// ---------- ป้ายแรงศรัทธา: ตุงผ้าแดงขอบทองแขวนเสาไม้ไผ่ปักริมน้ำด้านซ้าย บอก 3 อันดับแรก ----------
+// คะแนน = หัวใจที่กด + ของขวัญ (1 เหรียญ = 5) + โคมที่ปล่อย (ดวงละ 10) ชื่อกับคะแนนวาดบนผืนผ้า ส่วนรูปโปรไฟล์วาดทับจากจอ 2 มิติ (รูปจาก TikTok ใส่ในฉาก 3 มิติตรงๆ ไม่ได้)
+const RK={W:7.7,H:12.8,cw:512,ch:850,x:-8.9,y:13.1,z:-12,key:'-',top:[],slots:[[168,268],[168,458],[168,648]]};
+RK.cv=document.createElement('canvas');RK.cv.width=RK.cw;RK.cv.height=RK.ch;RK.tex=new THREE.CanvasTexture(RK.cv);RK.tex.colorSpace=THREE.SRGBColorSpace;RK.tex.anisotropy=4;
+RK.geo=new THREE.PlaneGeometry(RK.W,RK.H,6,12);RK.base=RK.geo.attributes.position.array.slice();
+RK.mesh=new THREE.Mesh(RK.geo,new THREE.MeshBasicMaterial({map:RK.tex,transparent:true,alphaTest:0.4,side:THREE.DoubleSide,color:0xcfcfcf}));RK.mesh.position.set(RK.x,RK.y,RK.z);scene.add(RK.mesh);
+{const px=RK.x-RK.W/2-0.5,top=RK.y+RK.H/2+0.5;
+  scene.add(solid([part(new THREE.CylinderGeometry(0.16,0.2,top+2,7),0xb89a5a,M4(px,top/2,RK.z)),part(new THREE.CylinderGeometry(0.1,0.1,RK.W+1.4,6),0xb89a5a,M4(RK.x-0.2,top-0.25,RK.z,0,0,Math.PI/2)),part(new THREE.SphereGeometry(0.28,8,6),0xd8a848,M4(px,top+1.1,RK.z))]));
+  const gl=glowSprite(0xffb050,5,0.45);gl.position.set(RK.x+RK.W/2+0.3,top-1.2,RK.z+0.2);scene.add(gl)}
+const faith=p=>p.hearts+p.wishes*10;
+function drawRank(){const x=RK.cv.getContext('2d'),w=RK.cw,h=RK.ch,top=RK.top;x.clearRect(0,0,w,h);
+  const shape=m=>{x.beginPath();x.moveTo(m,m);x.lineTo(w-m,m);x.lineTo(w-m,h-m*1.6);x.lineTo(w/2,h-90-m*0.6);x.lineTo(m,h-m*1.6);x.closePath()};
+  shape(0);const gr=x.createLinearGradient(0,0,0,h);gr.addColorStop(0,'#9c1a28');gr.addColorStop(1,'#5c0c18');x.fillStyle=gr;x.fill();
+  x.save();x.clip();x.strokeStyle='rgba(240,200,106,.13)';x.lineWidth=2;for(let i=-h;i<w+h;i+=44){x.beginPath();x.moveTo(i,0);x.lineTo(i+h,h);x.stroke();x.beginPath();x.moveTo(i,h);x.lineTo(i+h,0);x.stroke()}x.restore();
+  shape(9);x.strokeStyle='#f0c86a';x.lineWidth=8;x.stroke();shape(24);x.strokeStyle='rgba(240,200,106,.5)';x.lineWidth=3;x.stroke();
+  x.textAlign='center';x.fillStyle='#ffd978';x.font=`700 84px ${FONT}`;x.fillText('แรงศรัทธา',w/2,112);x.fillStyle='#ffe9c0';x.font=`700 36px ${FONT}`;x.fillText('สูงสุดคืนนี้',w/2,160);x.fillStyle='#f0c86a';x.fillRect(70,180,w-140,4);
+  if(!top.length){x.fillStyle='#ffe9c0';x.font=`700 46px ${FONT}`;x.fillText('ยังไม่มีอันดับ',w/2,330);x.font=`600 36px ${FONT}`;x.fillStyle='#ffd0a0';['พิมพ์คำอธิษฐาน','หรือกดหัวใจ','มาขึ้นป้ายกันเลย'].forEach((s,i)=>x.fillText(s,w/2,430+i*60))}
+  top.forEach((p,i)=>{const [ax,ay]=RK.slots[i],mc=['#f0c86a','#d8dce2','#d09a62'][i];
+    x.textAlign='center';x.fillStyle=mc;x.beginPath();x.arc(58,ay,32,0,7);x.fill();x.fillStyle='#3a1408';x.font=`700 44px ${FONT}`;x.fillText(String(i+1),58,ay+16);
+    x.fillStyle=mc;x.beginPath();x.arc(ax,ay,62,0,7);x.fill();x.fillStyle=p.shirt||'#6a5a8a';x.beginPath();x.arc(ax,ay,55,0,7);x.fill();x.fillStyle='#fff';x.font=`700 56px ${FONT}`;x.fillText((p.name||'?').slice(0,1).toUpperCase(),ax,ay+20);
+    x.textAlign='left';x.fillStyle='#fff3d8';x.font=`700 50px ${FONT}`;x.fillText(short(p.name,7),ax+78,ay-6);x.fillStyle='#ffd978';x.font=`700 42px ${FONT}`;x.fillText('♥ '+faith(p).toLocaleString(),ax+78,ay+46)});
+  RK.tex.needsUpdate=true}
+drawRank();document.fonts.load('700 84px Kanit','ก').then(drawRank).catch(()=>{});
+let rankT=0,rankLead='';
+function updRank(dt){const a=RK.geo.attributes.position,b=RK.base;for(let i=0;i<a.count;i++){const yy=b[i*3+1],k=(RK.H/2-yy)/RK.H;a.array[i*3+2]=Math.sin(yy*0.9+NOW*1.5+b[i*3]*0.4)*0.2*k}a.needsUpdate=true;RK.mesh.rotation.y=Math.sin(NOW*0.5)*0.04;
+  rankT-=dt;if(rankT>0)return;rankT=0.5;const top=Object.values(P).filter(p=>!p.sample&&faith(p)>0).sort((x,y)=>faith(y)-faith(x)).slice(0,3),key=top.map(p=>p.name+':'+faith(p)).join('|');
+  if(key===RK.key)return;RK.key=key;RK.top=top;drawRank();
+  if(top[0]&&top[0].name!==rankLead){const had=rankLead;rankLead=top[0].name;if(had&&top.length>1)mcSay('ตอนนี้คุณ{n}ขึ้นอันดับหนึ่งแรงศรัทธาแล้วครับ',{n:rankLead,ttl:12})}}
+
+// ---------- กล้อง: แกว่งช้าๆ และซูมไปหาคนที่ส่งของขวัญ 100 เหรียญขึ้นไปตอนปล่อยโคม มีลำแสงส่องลงมา เพื่อสรรเสริญ ----------
+const camAim=LOOK.clone(),HA=new THREE.Vector3();let camFov=58,honor=null,honQ=[];
+const shaft=new THREE.Mesh(new THREE.CylinderGeometry(0.6,4.4,46,20,1,true),new THREE.MeshBasicMaterial({color:0xffe2a0,map:canvasTex(8,128,(x,w,h)=>{const gr=x.createLinearGradient(0,0,0,h);gr.addColorStop(0,'rgba(255,255,255,0)');gr.addColorStop(0.55,'rgba(255,255,255,.45)');gr.addColorStop(1,'rgba(255,255,255,1)');x.fillStyle=gr;x.fillRect(0,0,w,h)}),transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide,fog:false}));shaft.visible=false;scene.add(shaft);
+function honorOf(p){if(honQ.length<3&&p.walker)honQ.push({p})}
+// อีกกี่มิลลิวินาทีกล้องจะซูมคนล่าสุดในคิวเสร็จ
+function honorWait(){return 3800+4700*(honQ.length+(honor?1:0))}
+function updCamera(dt){if(!honor&&honQ.length){honor=honQ.shift();honor.t0=NOW}
+  let aim=LOOK,fov=58,sh=0;
+  if(honor){const t=NOW-honor.t0,w=honor.p.walker;if(t>4.6||!w)honor=null;else{if(t<3.6){HA.set(w.g.position.x,9.5,w.g.position.z);aim=HA;fov=20}w.stop=Math.max(w.stop,1);w.cheer=Math.max(w.cheer,0.6);w.face=0;
+      sh=Math.min(1,t*2,(4.2-t)*2);shaft.position.set(w.g.position.x,23,w.g.position.z)}}
+  shaft.visible=sh>0.01;shaft.material.opacity=Math.max(0,sh)*0.22*(0.85+0.15*Math.sin(NOW*5));
+  const k=Math.min(1,dt*(honor?3.2:2.4));camAim.lerp(aim,k);camFov+=(fov-camFov)*k;
+  camera.position.x=Math.sin(NOW*0.07)*0.8;camera.position.y=4.5+Math.sin(NOW*0.11)*0.3;if(Math.abs(camera.fov-camFov)>0.01){camera.fov=camFov;camera.updateProjectionMatrix()}camera.lookAt(camAim)}
+
 scene.add(BULB.build());
 // ของที่ขยับทุกเฟรม
 function updScene(dt){T.value=NOW;updWalkers(dt);wheel.rotation.z+=dt*0.1;for(const gd of gondolas)gd.rotation.z=-wheel.rotation.z;
@@ -251,7 +294,7 @@ function updScene(dt){T.value=NOW;updWalkers(dt);wheel.rotation.z+=dt*0.1;for(co
   const mk=(NOW-meteorGo)/0.9;if(mk<1){meteor.position.set(meteorFrom.x+mk*130,meteorFrom.y-mk*58,-330);meteor.material.opacity=Math.sin(mk*Math.PI)*0.9}else meteor.material.opacity=0;
   for(const g of floats){const u=g.userData;g.position.x+=u.vx*dt;if(g.position.x>26)g.position.x=-26;if(g.position.x<-26)g.position.x=26;g.position.y=0.05+Math.sin(NOW*1.3+u.ph)*0.04;g.rotation.z=Math.sin(NOW*0.9+u.ph)*0.05;u.f.material.opacity=0.7+0.25*Math.sin(NOW*11+u.ph)}
   for(const f of flies){const u=f.userData;f.position.set(u.b.x+Math.sin(NOW*0.5+u.p)*1.5,u.b.y+Math.sin(NOW*0.8+u.p*2)*0.6,u.b.z+Math.cos(NOW*0.4+u.p)*1.5);f.material.opacity=0.4+0.4*Math.sin(NOW*3+u.p)}
-  hemi.intensity=1.1+flashAmt*0.9}
+  hemi.intensity=1.1+flashAmt*0.9;updRank(dt)}
 
 renderer.info.autoReset=false;
 const composer=new EffectComposer(renderer);composer.setSize(W,H);composer.addPass(new RenderPass(scene,camera));
@@ -268,8 +311,10 @@ const latheG=(()=>{const geo=new THREE.LatheGeometry(new THREE.SplineCurve(PROFI
     const k=1+(0.022+0.03*Math.min(1,Math.max(0,(y-1.2)/1.0)))*(1-Math.abs(Math.cos(a*PANELS/2)))*Math.min(1,y/0.5)+0.006*Math.sin(a*19+y*13)+0.005*Math.sin(a*31-y*23);p.setX(i,x*k);p.setZ(i,z*k)}
   geo.setAttribute('color',new THREE.BufferAttribute(col,3));geo.computeVertexNormals();return geo})();
 function canvasTex(w,h,draw){const c=document.createElement('canvas');c.width=w;c.height=h;draw(c.getContext('2d'),w,h);const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.wrapS=THREE.RepeatWrapping;t.anisotropy=4;return t}
-function crumple(x,w,h,R,n,al){x.filter='blur(1.4px)';for(let i=0;i<n;i++){const cx=R()*w,cy=R()*h,s=6+R()*22;x.fillStyle=R()<0.5?`rgba(255,255,255,${al*R()})`:`rgba(40,20,5,${al*R()})`;
-  x.beginPath();x.moveTo(cx+(R()-.5)*s,cy+(R()-.5)*s);x.lineTo(cx+(R()-.5)*s,cy+(R()-.5)*s);x.lineTo(cx+(R()-.5)*s,cy+(R()-.5)*s);x.fill()}x.filter='none'}
+function crumple(x,w,h,R,n,al){const c2=document.createElement('canvas');c2.width=w;c2.height=h;const y=c2.getContext('2d');
+  for(let i=0;i<n;i++){const cx=R()*w,cy=R()*h,s=6+R()*22;y.fillStyle=R()<0.5?`rgba(255,255,255,${al*R()})`:`rgba(40,20,5,${al*R()})`;
+    y.beginPath();y.moveTo(cx+(R()-.5)*s,cy+(R()-.5)*s);y.lineTo(cx+(R()-.5)*s,cy+(R()-.5)*s);y.lineTo(cx+(R()-.5)*s,cy+(R()-.5)*s);y.fill()}
+  x.filter='blur(1.4px)';x.drawImage(c2,0,0);x.filter='none'}
 function seams(x,w,h,style,half){x.fillStyle=style;for(let k=0;k<=PANELS;k++)x.fillRect(k*w/PANELS-half,0,half*2,h)}
 // เนื้อกระดาษสา: เส้นใย รอยยับ ตะเข็บกระดาษซ้อนสองชั้น
 const PAPER=canvasTex(512,512,(x,w,h)=>{const R=prng(11);x.fillStyle='#fff';x.fillRect(0,0,w,h);crumple(x,w,h,R,1100,0.12);
@@ -305,7 +350,7 @@ const HW_MAT=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.75,emi
 function buildLantern(kind){const K=KIND[kind],g=new THREE.Group();
   const mat=new THREE.MeshStandardMaterial({color:K.c,map:paperMap(kind),emissive:0xffffff,emissiveMap:glowMap(kind),emissiveIntensity:K.ei,side:THREE.DoubleSide,roughness:.9,transparent:true,opacity:.97,bumpMap:PAPER,bumpScale:1.2,vertexColors:true});
   g.add(new THREE.Mesh(latheG,mat));
-  const hw=new THREE.Mesh(HARDWARE,HW_MAT);g.add(hw);
+  const hw=new THREE.Mesh(HARDWARE,HW_MAT);hw.layers.set(1);g.add(hw);
   const flame=glowSprite(0xffc860,0.5,0.95);flame.scale.set(0.42,0.66,1);flame.position.y=0.26;g.add(flame);
   const gl=glowSprite(K.g,3.0,0.45);gl.position.y=1.2;g.add(gl);
   return {g,mat,hw,flame,gl}}
@@ -314,7 +359,7 @@ function dropLantern(L){scene.remove(L.g);L.mat.dispose();L.gl.material.dispose(
 function makeLantern(p,wish,kind='plain',opt={}){const K=KIND[kind],o=buildLantern(kind),g=o.g;
   const sc=2.3*K.s*(1+Math.min(0.5,(p&&p.hearts||0)/600));g.scale.setScalar(sc);
   const wk=walkerOf(p),src=wk?wk.g.position:(opt.x!=null?null:pick(walkers).g.position);if(wk){wk.stop=3.2;wk.cheer=2.8;wk.face=0}
-  g.position.set(opt.x??clamp(src.x,-21,21),5.0,opt.z??src.z);g.rotation.y=rnd(0,6.28);scene.add(g);
+  g.position.set(opt.x??clamp(src.x,-8,21),5.0,opt.z??src.z);g.rotation.y=rnd(0,6.28);scene.add(g);
   const L={...o,p,wish,kind,born:NOW,vy:rnd(2.0,2.8)*(kind==='giant'?0.8:1),vx:rnd(-0.55,0.45),ph:rnd(0,9),boost:0,boostT:-9,fade:1,ei:K.ei,sc};
   lanterns.push(L);if(lanterns.length>70)dropLantern(lanterns.shift());return L}
 function updLanterns(dt){for(const L of lanterns){const t=NOW-L.born;L.boost=Math.max(0,L.boost-dt*0.5);
@@ -327,7 +372,7 @@ function updLanterns(dt){for(const L of lanterns){const t=NOW-L.born;L.boost=Mat
 // ---------- โหมดดูโมเดล: โคมบนพื้นเทา แสงสตูดิโอ มุมเงยเหมือนภาพต้นแบบ ไว้เทียบสัดส่วนและรายละเอียด ----------
 const MODEL=Q.has('model');let modelView=null;
 if(MODEL){const ms=new THREE.Scene();ms.background=new THREE.Color(0xb4b7bb);ms.add(new THREE.HemisphereLight(0xffffff,0x5a5a5a,1.05));const dl=new THREE.DirectionalLight(0xffffff,0.55);dl.position.set(3,6,8);ms.add(dl);
-  const kinds=(Q.get('kind')||'plain').split(',').filter(k=>KIND[k]),cam=new THREE.PerspectiveCamera(30,W/H,0.1,100);
+  const kinds=(Q.get('kind')||'plain').split(',').filter(k=>KIND[k]),cam=new THREE.PerspectiveCamera(30,W/H,0.1,100);cam.layers.enable(1);
   const items=kinds.map((k,i)=>{const o=buildLantern(k);o.g.position.set((i%2-(Math.min(2,kinds.length)-1)/2)*2.3,-(i>>1)*3.1,0);o.g.rotation.y=+Q.get('rot')||0.2;ms.add(o.g);return o});
   const rowsN=Math.ceil(kinds.length/2);cam.position.set(0,-2.1-(rowsN-1)*1.55,kinds.length>1?(rowsN>1?17:12.5):10.2);cam.lookAt(0,1.15-(rowsN-1)*1.55,0);modelView={ms,cam,items}}
 
@@ -373,7 +418,7 @@ function updFireworks(dt){flashAmt*=Math.exp(-dt*4);
       const cc=v[3]?f.c3:f.c1;let I=I0;if(k>0.5&&Math.random()<f.tw)I*=Math.random()<0.5?1.9:0.12;   // ประกายระยิบช่วงท้าย
       const r=(cc.r+(f.c2.r-cc.r)*white)*I,g2=(cc.g+(f.c2.g-cc.g)*white)*I,bl=(cc.b+(f.c2.b-cc.b)*white)*I;
       for(let j=0;j<TR;j++){const d=b+j*3,tf=j?Math.pow(1-j/TR,1.6)*0.55:1;C[d]=r*tf;C[d+1]=g2*tf;C[d+2]=bl*tf}}
-    f.geo.attributes.position.needsUpdate=true;f.geo.attributes.color.needsUpdate=true;f.fl.material.opacity=Math.max(0,0.85-t*3.2)}
+    f.geo.attributes.position.needsUpdate=true;f.geo.attributes.color.needsUpdate=true;f.fl.material.opacity=Math.max(0,0.85-t*3.2);f.fl.visible=f.fl.material.opacity>0}
   fireworks=fireworks.filter(f=>!f.done)}
 // ชุดพลุ: heart = แทรกพลุรูปหัวใจสีชมพู  big = ลูกใหญ่ขึ้นและปิดท้ายด้วยพลุทองย้อย
 function show(n,o={}){fwBusy=NOW+n*0.34+4;let at=0;for(let i=0;i<n;i++){const heart=o.heart&&i%3===0,last=o.big&&i>=n-2;
@@ -383,34 +428,38 @@ function show(n,o={}){fwBusy=NOW+n*0.34+4;let at=0;for(let i=0;i<n;i++){const he
 let P={};
 const SHIRTS=['#a85a4a','#4a6a8a','#8a7a4a','#6a4a7a','#4a7a6a','#9a6a3a'];
 function setPic(p,url){if(!url||p.picUrl===url)return;p.picUrl=url;const im=new Image();im.referrerPolicy='no-referrer';im.src=url;p.pic=im}
-function player(name,pic){let p=P[name];if(!p){p=P[name]={name,hearts:0,last:NOW,lastLantern:-99,shirt:pick(SHIRTS),wishes:0};if(!PRESIM)announce(name)}setPic(p,pic);p.last=NOW;return p}
+function player(name,pic){let p=P[name];if(!p){p=P[name]={name,hearts:0,last:NOW,lastLantern:-99,shirt:pick(SHIRTS),wishes:0};}setPic(p,pic);p.last=NOW;return p}
 // กรองคำหยาบทั้งคำอธิษฐานและชื่อ (คำที่เจอบ่อย เพิ่มได้ในรายการ)
 const BAD=['ควย','เหี้ย','เหี้ย','สัส','สัด','เย็ด','หี','แตด','ไอ้สัตว์','อีสัตว์','ระยำ','ชาติหมา','พ่อมึงตาย','แม่มึงตาย','กระหรี่','ร่าน','fuck','shit','bitch','porn','sex','dick','pussy','nigg'];
 const clean=s=>!BAD.some(b=>String(s).toLowerCase().includes(b));
 const SAMPLE=['ขอให้ทุกคนมีความสุข','ขอให้สอบผ่าน','ขอให้รวยๆ','ขอให้หายป่วยไวๆ','ขอให้ครอบครัวแข็งแรง','ขอให้งานปัง','ขอให้เจอคนดีๆ'];
 function wishText(t){t=String(t||'').replace(/\s+/g,' ').trim();if(!clean(t)||t.replace(/[\d\s.!?]/g,'').length<2)return pick(['ขอให้สมหวัง','ขอให้โชคดี','ขอให้มีความสุข']);return t.slice(0,34)}
 function myLantern(p){for(let i=lanterns.length-1;i>=0;i--)if(lanterns[i].p===p&&lanterns[i].g.position.y<60)return lanterns[i];return null}
-function launch(p,wish,kind='plain',opt){p.lastLantern=NOW;p.wishes++;wishesTotal++;const L=makeLantern(p,wish,kind,opt);sfx(kind==='plain'?'gift1':'gift2',0.55);return L}
+function launch(p,wish,kind='plain',opt){p.lastLantern=NOW;p.wishes++;wishesTotal++;const L=makeLantern(p,wish,kind,opt);sfx(kind==='plain'?'gift1':'gift2',0.55);if(p.wishes===1&&!p.sample)firstLantern(p);return L}
 
 // ---------- รับเหตุการณ์ ----------
-let wishesTotal=0,liveHearts=0,msIdx=0,lastChat=-99,banners=[],cards=[],sparks=[];
+let nearSaid=false,wishesTotal=0,liveHearts=0,msIdx=0,lastChat=-99,banners=[],cards=[],sparks=[];
 const MS_G=i=>[150,400,800,1500,2500][i]??2500+(i-4)*1500;
 function comment(name,text,pic){const p=player(name,pic),w=wishText(text);lastChat=NOW;
-  const L=myLantern(p);if(L&&NOW-p.lastLantern<8){L.wish=w;L.born=Math.min(L.born,NOW-0.01);L.bubbleT=NOW}else launch(p,w)}
+  const L=myLantern(p);if(L&&NOW-p.lastLantern<2.5){L.wish=w;L.born=Math.min(L.born,NOW-0.01);L.bubbleT=NOW}else launch(p,w)}
 function like(name,n,pic){const p=player(name,pic);p.hearts+=n;liveHearts+=n;let L=myLantern(p);if(!L)L=launch(p,pick(['ขอให้สมหวัง','ขอให้โชคดี','ขอให้มีความสุข']));
   L.boost=Math.min(3,L.boost+n*0.12);L.boostT=NOW;for(let i=0;i<Math.min(6,n);i++)sparks.push({L,t:NOW+i*0.05,dx:rnd(-40,40)});
-  while(liveHearts>=MS_G(msIdx)){banner(`หัวใจครบ ${MS_G(msIdx).toLocaleString()} ดวง!`,'#ff8aa8','พลุฉลองให้ทุกคน');show(7+Math.min(6,msIdx*2),{heart:true});sfx('win',0.7);msIdx++}}
+  while(liveHearts>=MS_G(msIdx)){banner(`หัวใจครบ ${MS_G(msIdx).toLocaleString()} ดวง!`,'#ff8aa8','พลุฉลองให้ทุกคน');show(7+Math.min(6,msIdx*2),{heart:true});sfx('win',0.7);mcSay('หัวใจครบ '+MS_G(msIdx)+' ดวงแล้วครับ จุดพลุฉลองกันเลย',{pri:1,chime:1,ttl:20});msIdx++;nearSaid=false}
+  if(!nearSaid&&liveHearts>=MS_G(msIdx)*0.8&&MS_G(msIdx)-liveHearts>8){nearSaid=true;mcSay('อีกนิดเดียวพลุจะขึ้นแล้วครับ ช่วยกันกดหัวใจหน่อยครับ',{ttl:10})}}
 const GIMG={};
 function giftImg(id,url){if(!id)return null;if(GIMG[id])return GIMG[id];const im=new Image();im.onerror=()=>{if(url&&im.src!==url)im.src=url};im.src=`/gifts/${id}.png`;return GIMG[id]=im}
 const TIERS=[{id:'5655',c:1,n:'โคมดอกไม้'},{id:'5879',c:30,n:'โคมทอง'},{id:'5660',c:100,n:'โคมยักษ์ + พลุ'},{id:'6267',c:299,n:'ฟ้าเต็มโคม'}];TIERS.forEach(t=>giftImg(t.id));
-function gift(name,coins,giftId,img,pic){const p=player(name,pic);p.hearts+=coins*5;const icon=giftId?giftImg(giftId,img):null,w=myLantern(p)?.wish||'ขอให้สมหวัง';
-  if(coins>=299){launch(p,w,'giant');for(let i=0;i<10;i++)setTimeout(()=>makeLantern(p,null,'gold'),300+i*180);show(14,{big:true});card(p,icon,coins,'ฟ้าเต็มโคม');sfx('gift4')}
-  else if(coins>=100){launch(p,w,'giant');show(6);card(p,icon,coins,'โคมยักษ์');sfx('gift3')}
+function gift(name,coins,giftId,img,pic){const p=player(name,pic);p.skipFirst=!p.wishes;p.hearts+=coins*5;const icon=giftId?giftImg(giftId,img):null,w=myLantern(p)?.wish||'ขอให้สมหวัง';
+  if(coins>=299){const d=honorWait();launch(p,w,'giant');for(let i=0;i<10;i++)setTimeout(()=>makeLantern(p,null,'gold'),d+i*220);setTimeout(()=>show(14,{big:true}),d-300);card(p,icon,coins,'ฟ้าเต็มโคม');sfx('gift4')}
+  else if(coins>=100){const d=honorWait();launch(p,w,'giant');setTimeout(()=>show(6),d-300);card(p,icon,coins,'โคมยักษ์');sfx('gift3')}
   else if(coins>=30){launch(p,w,'gold');sfx('gift2')}
   else{for(let i=0;i<Math.min(5,coins);i++)setTimeout(()=>launch(p,w,'flower'),i*250);sfx('gift1')}
-  popupAt(myLantern(p),`${coins} เหรียญ`,icon)}
+  popupAt(myLantern(p),`${coins} เหรียญ`,icon);greeted.add(name);
+  if(coins>=100){honorOf(p);mcSay('ขอเสียงปรบมือให้คุณ{n}ด้วยครับ ปล่อย'+(coins>=299?'โคมเต็มท้องฟ้า':'โคมยักษ์')+'ขึ้นฟ้าแล้ว ขอให้สมหวังทุกประการครับ',{n:name,f:'ขอเสียงปรบมือด้วยครับ มีโคมยักษ์ขึ้นฟ้าแล้ว',pri:1,chime:1,ttl:40})}
+  else if(coins>=30)mcSay('ขอบคุณคุณ{n}สำหรับโคมทองครับ',{n:name,f:'ขอบคุณสำหรับโคมทองครับ',pri:1,ttl:25});
+  else if(NOW-(p.thankT||-99)>20){p.thankT=NOW;mcSay('ขอบคุณคุณ{n}สำหรับโคมดอกไม้ครับ',{n:name,f:'ขอบคุณสำหรับโคมดอกไม้ครับ',ttl:15})}}
 const followDone=new Set();
-function follow(name,pic,repeat){const p=player(name,pic);if(repeat||followDone.has(name))return;followDone.add(name);launch(p,'ขอบคุณที่กดติดตาม','gold');banner(`ขอบคุณ ${short(name,12)} ที่กดติดตาม`,'#f0c86a','ได้โคมทองฟรี 1 ดวง')}
+function follow(name,pic,repeat){const p=player(name,pic);if(repeat||followDone.has(name))return;followDone.add(name);p.skipFirst=!p.wishes;launch(p,'ขอบคุณที่กดติดตาม','gold');mcSay('ขอบคุณคุณ{n}ที่กดติดตามครับ รับโคมทองไปเลยหนึ่งดวง',{n:name,f:'ขอบคุณที่กดติดตามครับ',pri:1,ttl:25});banner(`ขอบคุณ ${short(name,12)} ที่กดติดตาม`,'#f0c86a','ได้โคมทองฟรี 1 ดวง')}
 function banner(s,col,sub=''){banners.push({s,col,sub,t:Math.max(NOW,...banners.map(b=>b.t+2.4))})}
 function card(p,icon,coins,title){cards.push({p,icon,coins,title,t:Math.max(NOW,...cards.map(c=>c.t+3))})}
 let pops=[];function popupAt(L,s,img){if(!L)return;pops.push({L,s,img,t:NOW})}
@@ -434,16 +483,45 @@ function musicTick(){const c=SND.ctx,b=SND.buf.bgm_lantern;if(!c||c.state!=='run
   const now=c.currentTime,X=4;if(now<MUS.next)return;
   const src=c.createBufferSource(),gn=c.createGain();src.buffer=b;gn.gain.setValueAtTime(0.0001,now);gn.gain.linearRampToValueAtTime(1,now+X);gn.gain.setValueAtTime(1,now+b.duration-X);gn.gain.linearRampToValueAtTime(0.0001,now+b.duration);
   src.connect(gn).connect(MUS.bus);src.start(now);MUS.next=now+b.duration-X}
-const ANN=[];let annBusy=false;
-function announce(name){if(PRESIM||!clean(name))return;if(ANN.length>=40)ANN.shift();ANN.push({t:name,at:performance.now()/1000});if(!annBusy)annNext()}
-function say(text){if(ANN.length<40)ANN.push({t:text,at:performance.now()/1000,line:true});if(!annBusy)annNext()}
-async function annNext(){while(ANN.length&&performance.now()/1000-ANN[0].at>120)ANN.shift();const a=ANN.shift();if(!a){annBusy=false;return}annBusy=true;const c=SND.ctx;
-  if(!c||c.state!=='running'){annBusy=false;ANN.length=0;return}
-  const buf=await Promise.race([fetch('/say?v=niwat&t='+encodeURIComponent(a.t),{cache:'no-cache'}).then(r=>r.ok?r.arrayBuffer():null).then(b=>b?c.decodeAudioData(b):null).catch(()=>null),new Promise(r=>setTimeout(()=>r(null),6000))]);
-  if(buf&&MUS.bus)MUS.bus.gain.setTargetAtTime(MUS.vol*0.45,c.currentTime,0.08);
-  if(buf)await new Promise(res=>{const s=c.createBufferSource();s.buffer=buf;if(ANN.length>=3)s.playbackRate.value=1.12;const g=c.createGain();g.gain.value=a.line?0.75:0.6;s.connect(g).connect(SND.master);s.onended=res;s.start()});
-  if(!ANN.length&&MUS.bus)MUS.bus.gain.setTargetAtTime(MUS.vol,c.currentTime,0.5);
-  setTimeout(annNext,ANN.length>=3?150:500)}
+// ---------- โฆษกงานวัด: พูดผ่านลำโพงฮอร์น ต้อนรับคนเข้าด้วยชื่อ ขอบคุณ ชวนเล่น พูดเรื่อยๆ ----------
+// เสียงสร้างที่ server (/mc) ด้วย Edge TTS ฟรี เสียงเดียวกันทุกประโยค แล้วหน้าเกมใส่เอฟเฟกต์ลำโพง: ตัดเสียงทุ้มกับแหลม ดันเสียงกลาง แตกนิดๆ และก้องสะท้อนลานงาน
+const MC={q:[],busy:false,lastEnd:-99,idleT:9,recent:[],pa:null,n:0};
+const MC_IDLE=['ขอบคุณทุกท่านที่แวะเข้ามาชมงานนะครับ','ท่านใดเพิ่งเข้ามา พิมพ์คำอธิษฐานได้เลยครับ โคมของท่านจะลอยขึ้นฟ้าทันที','เชิญครับเชิญ พิมพ์อะไรก็ได้ ได้โคมหนึ่งดวงเป็นของตัวเองเลยครับ',
+  'กดหัวใจรัวๆ โคมของท่านจะสว่างและลอยสูงขึ้นนะครับ','คืนนี้อากาศดี ฟ้าเปิด เหมาะกับการปล่อยโคมมากครับ','อยากขออะไร พิมพ์มาได้เลยครับ ทางเราปล่อยโคมให้ฟรี ไม่มีค่าใช้จ่าย',
+  'มาคนเดียว มาเป็นคู่ หรือมาทั้งบ้าน ยินดีต้อนรับทุกท่านครับ','ช่วยกันกดหัวใจหน่อยครับ หัวใจครบเมื่อไหร่ เราจุดพลุฉลองกันทันที','ท่านที่ชอบบรรยากาศแบบนี้ กดติดตามไว้ได้เลยนะครับ จะได้ไม่พลาดงานครั้งหน้า',
+  'ขอให้ทุกคำอธิษฐานคืนนี้สมหวังดังตั้งใจนะครับ','ทดสอบไมค์ หนึ่ง สอง สาม ได้ยินชัดไหมครับ ถ้าได้ยิน พิมพ์มาบอกกันหน่อย','ใครแรงศรัทธาสูงสุด ขึ้นป้ายทางซ้ายมือเลยนะครับ',
+  'ร้านน้ำแข็งใส ร้านสายไหม เปิดบริการแล้วนะครับ เดินชมงานกันตามสบาย','ท่านใดยังไม่ได้ปล่อยโคม เชิญเลยครับ พิมพ์คำอธิษฐานมาได้เลย'];
+const MC_WELCOME=['ยินดีต้อนรับคุณ{n}เข้าสู่งานครับ','สวัสดีครับคุณ{n} เชิญปล่อยโคมได้เลยครับ','คุณ{n}มาแล้วครับ ยินดีต้อนรับครับ','ขอต้อนรับคุณ{n}ครับ พิมพ์คำอธิษฐานได้เลยนะครับ','คุณ{n}เข้างานมาแล้วครับ ขอบคุณที่แวะมานะครับ'];
+const MC_WELCOME_F=['ยินดีต้อนรับผู้ชมท่านใหม่ครับ','มีผู้ชมเข้ามาเพิ่มแล้วครับ ยินดีต้อนรับครับ'];
+const MC_FIRST=['คุณ{n}ปล่อยโคมแล้วครับ ขอให้สมหวังนะครับ','โคมของคุณ{n}ลอยขึ้นฟ้าแล้วครับ ขอให้ได้ดังที่ขอนะครับ','ยินดีต้อนรับคุณ{n}ครับ โคมดวงแรกขึ้นฟ้าเรียบร้อย'];
+function pickLine(list){let t;for(let i=0;i<8;i++){t=pick(list);if(!MC.recent.includes(t))break}MC.recent.push(t);if(MC.recent.length>7)MC.recent.shift();return t}
+function mcPA(){const c=SND.ctx;if(MC.pa)return MC.pa;const inp=c.createGain(),hp=c.createBiquadFilter(),lp=c.createBiquadFilter(),pk=c.createBiquadFilter(),ws=c.createWaveShaper(),dry=c.createGain(),dl=c.createDelay(1),dlp=c.createBiquadFilter(),fb=c.createGain(),wet=c.createGain();
+  hp.type='highpass';hp.frequency.value=430;lp.type='lowpass';lp.frequency.value=3300;pk.type='peaking';pk.frequency.value=1700;pk.Q.value=1.1;pk.gain.value=7;
+  const cv=new Float32Array(1024);for(let i=0;i<1024;i++){const x=i/512-1;cv[i]=Math.tanh(x*2.4)/Math.tanh(2.4)}ws.curve=cv;
+  dry.gain.value=0.85;dl.delayTime.value=0.21;dlp.type='lowpass';dlp.frequency.value=2000;fb.gain.value=0.27;wet.gain.value=0.32;
+  inp.connect(hp).connect(lp).connect(pk).connect(ws);ws.connect(dry).connect(SND.master);ws.connect(dl);dl.connect(dlp);dlp.connect(fb).connect(dl);dlp.connect(wet).connect(SND.master);return MC.pa=inp}
+// เสียงสัญญาณก่อนประกาศ ติ๊ง ต่อง ติ๊ง (สังเคราะห์สด ไม่ใช้ไฟล์)
+function mcChime(){const c=SND.ctx,t0=c.currentTime;[[784,0],[659,0.28],[523,0.56]].forEach(([f,d])=>{const o=c.createOscillator(),gn=c.createGain();o.type='triangle';o.frequency.value=f;gn.gain.setValueAtTime(0.0001,t0+d);gn.gain.exponentialRampToValueAtTime(0.45,t0+d+0.02);gn.gain.exponentialRampToValueAtTime(0.0001,t0+d+0.7);o.connect(gn).connect(mcPA());o.start(t0+d);o.stop(t0+d+0.75)});return new Promise(r=>setTimeout(r,950))}
+// o.n = ชื่อคน (แทน {n})  o.f = ประโยคสำรองถ้าอ่านชื่อไม่ได้  o.pri = แซงคิว  o.chime = มีเสียงสัญญาณนำ  o.ttl = รอในคิวได้กี่วินาที
+function mcSay(t,o={}){if(PRESIM||MODEL)return;if(o.n!=null&&!clean(o.n))return;const q=MC.q;if(q.length>=10){const i=q.findIndex(x=>!x.pri);if(i<0)return;q.splice(i,1)}
+  const it={t,n:o.n,f:o.f,pri:o.pri||0,chime:o.chime,w:o.w,at:performance.now()/1000,ttl:o.ttl||30};if(it.pri){const i=q.findIndex(x=>!x.pri);q.splice(i<0?q.length:i,0,it)}else q.push(it);if(!MC.busy)mcNext()}
+async function mcNext(){const c=SND.ctx,now=()=>performance.now()/1000;MC.q=MC.q.filter(x=>now()-x.at<x.ttl);const a=MC.q.shift();if(!a){MC.busy=false;return}
+  if(!c||c.state!=='running'){MC.busy=false;MC.q.length=0;return}MC.busy=true;
+  const url='/mc?t='+encodeURIComponent(a.t)+(a.n!=null?'&n='+encodeURIComponent(a.n):'')+(a.f?'&f='+encodeURIComponent(a.f):'');
+  const bufP=fetch(url,{cache:'no-cache'}).then(r=>r.ok?r.arrayBuffer():null).then(b=>b?c.decodeAudioData(b):null).catch(()=>null);
+  if(MUS.bus)MUS.bus.gain.setTargetAtTime(MUS.vol*0.4,c.currentTime,0.1);
+  if(a.chime)await mcChime();
+  const buf=await Promise.race([bufP,new Promise(r=>setTimeout(()=>r(null),7000))]);
+  if(buf)await new Promise(res=>{const s=c.createBufferSource(),gn=c.createGain();s.buffer=buf;gn.gain.value=0.95;s.connect(gn).connect(mcPA());s.onended=res;s.start()});
+  MC.lastEnd=NOW;MC.said=(MC.said||0)+(buf?1:0);if(!MC.q.length&&MUS.bus)MUS.bus.gain.setTargetAtTime(MUS.vol,c.currentTime,0.6);setTimeout(mcNext,MC.q.length?250:500)}
+// ต้อนรับคนเข้าใหม่ด้วยชื่อ (ทั้งคนที่เพิ่งเข้าห้องและคนที่เริ่มเล่น) คนละครั้ง มีแถบชื่อขึ้นบนจอด้วย ถ้าเข้ามาถี่ใช้ประโยคสั้น
+const greeted=new Set();let toasts=[];
+function welcome(name){if(PRESIM||!name||greeted.has(name)||!clean(name))return;greeted.add(name);toasts.push({name,t:NOW});if(toasts.length>4)toasts.shift();
+  mcSay(MC.q.filter(x=>x.w).length>=2?'ยินดีต้อนรับคุณ{n}ครับ':pickLine(MC_WELCOME),{n:name,f:pick(MC_WELCOME_F),ttl:25,w:1})}
+function firstLantern(p){if(p.skipFirst){p.skipFirst=false;greeted.add(p.name);return}const was=greeted.has(p.name);greeted.add(p.name);if(!was){toasts.push({name:p.name,t:NOW});if(toasts.length>4)toasts.shift()}
+  if(MC.q.length<4)mcSay(pickLine(was?MC_FIRST.slice(0,2):MC_FIRST),{n:p.name,f:'มีโคมดวงใหม่ลอยขึ้นแล้วครับ ขอให้สมหวังนะครับ',ttl:18})}
+// ตอนไม่มีอะไรจะพูด โฆษกพูดเองทุก 12-18 วินาที
+function mcIdle(dt){MC.idleT-=dt;if(MC.idleT>0||MC.busy||MC.q.length||NOW-MC.lastEnd<4)return;MC.idleT=rnd(12,18);MC.n++;mcSay(pickLine(MC_IDLE),{chime:MC.n%4===1,ttl:10})}
 sndInit();
 
 // ---------- จอ 2 มิติทับด้านบน: ป้าย ชื่อ คำอธิษฐาน ----------
@@ -478,60 +556,79 @@ function hud(){
   panel(16,y,1048,52,'#ff8aa8',0.55);heart(48,y+27,26);txt(`หัวใจทั้งไลฟ์ ${liveHearts.toLocaleString()} / ${g1.toLocaleString()}  ครบแล้วจุดพลุ`,76,y+24,20,'#fff','left',600);
   txt(`ปล่อยโคมแล้ว ${wishesTotal.toLocaleString()} ดวง`,1044,y+24,20,'#ffd08a','right',600);
   g.fillStyle='rgba(0,0,0,.4)';g.fillRect(76,y+33,968,10);const gr=g.createLinearGradient(76,0,1044,0);gr.addColorStop(0,'#ff6a8a');gr.addColorStop(1,'#ffd08a');g.fillStyle=gr;g.fillRect(76,y+33,968*k,10);
-  if(!DEMO&&live.state!=='live')txt({connecting:'กำลังต่อไลฟ์...',offline:'รอไลฟ์เริ่ม...',error:'ต่อไลฟ์ไม่ได้',server:'ไม่เจอ server.js'}[live.state]||'',540,y+86,22,'#ffd08a','center',500)}
+  if(!DEMO&&live.state!=='live')txt({connecting:'กำลังต่อไลฟ์...',offline:'รอไลฟ์เริ่ม...',error:'ต่อไลฟ์ไม่ได้',server:'ไม่เจอ server.js'}[live.state]||'',540,y+140,22,'#ffd08a','center',500)}
+function drawToasts(){toasts=toasts.filter(x=>NOW-x.t<6);if(!toasts.length)return;const s='ยินดีต้อนรับ   '+toasts.slice(-3).map(x=>short(x.name,10)).join('  ·  ');g.font=`700 26px ${FONT}`;
+  const w=Math.min(1040,g.measureText(s).width+60),a=clamp((6-(NOW-toasts[toasts.length-1].t))*2,0,1);g.globalAlpha=a;g.fillStyle='rgba(70,18,30,.86)';g.beginPath();g.roundRect(540-w/2,SAFE_T+266,w,46,23);g.fill();g.strokeStyle='#ffd08a';g.lineWidth=2;g.stroke();txt(s,540,SAFE_T+299,26,'#ffe9c0','center',700);g.globalAlpha=1}
+function drawRankFaces(){RK.mesh.updateMatrixWorld();RK.top.forEach((p,i)=>{if(!(p.pic&&p.pic.complete&&p.pic.naturalWidth))return;const [ax,ay]=RK.slots[i],lx=(ax/RK.cw-0.5)*RK.W,ly=(0.5-ay/RK.ch)*RK.H;
+  V.set(lx,ly,0.02).applyMatrix4(RK.mesh.matrixWorld).project(camera);if(V.z>1||Math.abs(V.x)>1.1||Math.abs(V.y)>1.1)return;const sx=(V.x*0.5+0.5)*W,sy=(-V.y*0.5+0.5)*H;
+  V.set(lx+55/RK.cw*RK.W,ly,0.02).applyMatrix4(RK.mesh.matrixWorld).project(camera);const r=Math.abs((V.x*0.5+0.5)*W-sx);if(r<2)return;
+  g.save();g.beginPath();g.arc(sx,sy,r,0,7);g.clip();g.drawImage(p.pic,sx-r,sy-r,r*2,r*2);g.restore()})}
+function drawHonorFx(){if(!honor)return;const t=NOW-honor.t0,a=clamp(Math.min(t*2,(4.4-t)*2),0,1);if(a<=0)return;const vg=g.createRadialGradient(540,900,260,540,900,1150);vg.addColorStop(0,'rgba(8,5,25,0)');vg.addColorStop(1,`rgba(8,5,25,${0.6*a})`);g.fillStyle=vg;g.fillRect(0,0,W,H);
+  g.fillStyle=`rgba(255,236,170,${a})`;for(let i=0;i<16;i++){const an=NOW*0.9+i*0.3927,r=300+40*Math.sin(NOW*2.3+i),x=540+Math.cos(an)*r,y=880+Math.sin(an)*r*1.15,s=5+4*Math.sin(NOW*7+i*1.7);g.fillRect(x-s,y-1.5,s*2,3);g.fillRect(x-1.5,y-s,3,s*2)}}
 function drawOverlay(){g.clearRect(0,0,W,H);
-  drawLabels();
+  drawHonorFx();drawRankFaces();drawLabels();
   sparks=sparks.filter(sp=>NOW-sp.t<1);for(const sp of sparks){const k=NOW-sp.t;if(k<0)continue;const s=screenOf(sp.L);g.globalAlpha=1-k;heart(s.x+sp.dx,s.y-40-k*90,18+k*10,'#ff7a9a');g.globalAlpha=1}
   pops=pops.filter(p=>NOW-p.t<1.6);for(const p of pops){const k=(NOW-p.t)/1.6,s=screenOf(p.L);g.globalAlpha=1-k*k;if(p.img)drawImg(p.img,s.x,s.y-120-k*60,70);txt(p.s,s.x,s.y-70-k*60,26,'#ffe08a','center');g.globalAlpha=1}
-  hud();
+  hud();drawToasts();
   const bn=banners.find(b=>NOW>=b.t&&NOW<b.t+2.4);banners=banners.filter(b=>NOW<b.t+2.4);
   if(bn){const k=ease.back(Math.min(1,(NOW-bn.t)/0.3));g.save();g.translate(540,700);g.scale(k,k);g.translate(-540,-700);panel(90,630,900,bn.sub?150:100,bn.col,0.8);txt(bn.s,540,696,46,bn.col,'center');if(bn.sub)txt(bn.sub,540,750,30,'#fff','center',600);g.restore()}
   const cd=cards.find(c=>NOW>=c.t&&NOW<c.t+3);cards=cards.filter(c=>NOW<c.t+3);
-  if(cd){const k=ease.back(Math.min(1,(NOW-cd.t)/0.35)),a=Math.min(1,(cd.t+3-NOW)*3);g.globalAlpha=a;g.save();g.translate(540,430);g.scale(k,k);g.translate(-540,-430);
-    panel(90,350,900,170,'#ffd08a',0.85);avatar(cd.p,200,435,56,'#ffd08a');txt('ขอบคุณ',282,406,28,'#ffe9c0','left',500);txt(short(cd.p.name,12),282,466,52,'#ffd08a','left',700);txt(cd.title,282,506,26,'#fff','left',600);drawImg(cd.icon,900,430,96);
+  if(cd){const k=ease.back(Math.min(1,(NOW-cd.t)/0.35)),a=Math.min(1,(cd.t+3-NOW)*3);g.globalAlpha=a;g.save();g.translate(540,480);g.scale(k,k);g.translate(-540,-480);
+    panel(90,400,900,170,'#ffd08a',0.85);avatar(cd.p,200,485,56,'#ffd08a');txt('ขอบคุณ',282,456,28,'#ffe9c0','left',500);txt(short(cd.p.name,12),282,516,52,'#ffd08a','left',700);txt(cd.title,282,556,26,'#fff','left',600);drawImg(cd.icon,900,480,96);
     g.restore();g.globalAlpha=1}
-  if(!lanterns.some(L=>L.p&&!L.p.sample&&NOW-L.born<20)&&!bn){const k=0.8+0.2*Math.sin(NOW*3);g.globalAlpha=k;panel(150,560,780,140,'#ffd08a',0.7);txt('พิมพ์คำอธิษฐานมาเลย',540,622,46,'#ffd08a','center');txt('แล้วดูโคมของคุณลอยขึ้นฟ้า',540,672,30,'#fff','center',600);g.globalAlpha=1}
+  if(!lanterns.some(L=>L.p&&!L.p.sample&&NOW-L.born<20)&&!bn){const k=0.8+0.2*Math.sin(NOW*3);g.globalAlpha=k;panel(150,410,780,140,'#ffd08a',0.7);txt('พิมพ์คำอธิษฐานมาเลย',540,472,46,'#ffd08a','center');txt('แล้วดูโคมของคุณลอยขึ้นฟ้า',540,522,30,'#fff','center',600);g.globalAlpha=1}
   if(SND.ctx&&SND.ctx.state!=='running'){g.fillStyle='rgba(14,16,20,.8)';g.beginPath();g.roundRect(290,1846,500,52,26);g.fill();txt('คลิกจอ 1 ครั้ง เพื่อเปิดเสียง',540,1882,28,'#ffd08a','center',600)}
+  if((Q.has('test')||Q.has('fps'))&&fpsNow){g.fillStyle='rgba(14,16,20,.75)';g.beginPath();g.roundRect(W-250,1690,234,44,12);g.fill();txt(`${Math.round(fpsNow)} เฟรม/วิ${quality?'  ลดภาพ '+quality:''}`,W-133,1721,24,fpsNow>=50?'#9fe08a':fpsNow>=34?'#ffd04a':'#ff6a6a','center',600)}
   if(SHOWSAFE){g.fillStyle='rgba(255,0,0,.25)';g.fillRect(0,0,W,SAFE_T);g.fillRect(0,SAFE_B,W,H-SAFE_B)}}
 
 // ---------- ตอนไม่มีใครเล่น: โคมตัวอย่างลอยให้ฟ้าไม่ว่าง และชวนให้พิมพ์ ----------
 const SAMPLE_P={name:'ตัวอย่าง',sample:true,shirt:'#6a5a8a',hearts:0};let sampleT=2,ctaT=40;
 function attract(dt){const busy=Object.values(P).some(p=>NOW-p.last<30);
   sampleT-=dt;if(sampleT<=0){sampleT=busy?rnd(12,20):rnd(4,7);makeLantern(busy?null:SAMPLE_P,busy?null:pick(SAMPLE),'sample')}
-  ctaT-=dt;if(ctaT<=0){ctaT=45;if(NOW-lastChat>20)say('พิมพ์คำอธิษฐานมาเลย แล้วดูโคมของคุณลอยขึ้นฟ้า')}}
+  mcIdle(dt)}
 
 // ---------- คนดูจำลอง / โหมดทดสอบ ----------
-const FAKE=['ploy_99','mek.k','nongbeam','jaa_jaa','tonkla','minnie.th','pond2002','fern.f'];let simT={c:1,l:0,g:9};
+const FAKE=['ploy_99','mek.k','nongbeam','jaa_jaa','tonkla','minnie.th','pond2002','fern.f'],FAKE2=['somchai','น้องมายด์','beer_bkk','kwankwan','aomsin','พี่ต้น','nutty','น้องฟ้า','benz','ป้าแดง'];let simT={c:1,l:0,g:9,j:3};
 function sim(){const act=Object.values(P).filter(p=>!p.sample&&NOW-p.last<IDLE);
   if(NOW>simT.c){simT.c=NOW+rnd(2,5);comment(pick(FAKE),pick(SAMPLE))}
+  if(NOW>simT.j){simT.j=NOW+rnd(6,11);welcome(pick(FAKE2))}
   if(NOW>simT.l){simT.l=NOW+0.5;if(act.length&&Math.random()<0.7)like(pick(act).name,rnd(1,6)|0)}
   if(NOW>simT.g){simT.g=NOW+rnd(10,18);if(act.length)gift(pick(act).name,pick([1,1,5,30,30,100,299]))}}
 let crowdOn=Q.has('demo');
 if(Q.has('test')){const me='ผู้ทดสอบ',bar=document.createElement('div');
   bar.style.cssText='position:fixed;left:0;right:0;bottom:0;background:rgba(14,16,20,.92);padding:8px;display:flex;flex-wrap:wrap;gap:6px;justify-content:center;font:600 15px Kanit,Tahoma;z-index:9';
   const btn=(l,fn,bg='#3a3f48')=>{const b=document.createElement('button');b.textContent=l;b.style.cssText=`background:${bg};color:#fff;border:0;border-radius:8px;padding:8px 10px;font:inherit;cursor:pointer`;b.onclick=e=>{e.stopPropagation();SND.ctx&&SND.ctx.resume();fn()};bar.appendChild(b);return b};
-  btn('พิมพ์คำอธิษฐาน',()=>{const t=prompt('คำอธิษฐาน','ขอให้สอบผ่าน');if(t)comment(me,t)},'#4a7a3a');btn('♥ x5',()=>like(me,5),'#c0394b');btn('♥ x50',()=>like(me,50),'#c0394b');
+  const inp=document.createElement('input');inp.value='ขอให้สอบผ่าน';inp.maxLength=34;inp.style.cssText='font:inherit;padding:7px 9px;border-radius:8px;border:0;width:190px';inp.onpointerdown=e=>e.stopPropagation();inp.onkeydown=e=>{e.stopPropagation();if(e.key==='Enter')comment(me,inp.value)};bar.appendChild(inp);btn('ปล่อยโคม',()=>comment(me,inp.value),'#4a7a3a');btn('♥ x5',()=>like(me,5),'#c0394b');btn('♥ x50',()=>like(me,50),'#c0394b');
   btn('กุหลาบ 1',()=>gift(me,1,'5655'),'#8a5a2a');btn('โดนัท 30',()=>gift(me,30,'5879'),'#8a5a2a');btn('มือหัวใจ 100',()=>gift(me,100,'5660'),'#8a5a2a');btn('คอร์กี้ 299',()=>gift(me,299,'6267'),'#8a5a2a');
-  btn('กดติดตาม',()=>{followDone.delete(me);follow(me)},'#c0394b');btn('พลุ',()=>show(8,{heart:true}),'#5a3a7a');const cb=btn('คนดูจำลอง: ปิด',()=>{crowdOn=!crowdOn;cb.textContent='คนดูจำลอง: '+(crowdOn?'เปิด':'ปิด')});document.body.appendChild(bar)}
-Object.assign(window,{comment,like,gift,follow,show,rocket,burst,P,dbg:()=>({music:MUS.next>0,audio:SND.ctx&&SND.ctx.state,lanterns:lanterns.length,walkers:walkers.length,fireworks:fireworks.length,quality,fps:Math.round(fpsNow),calls:renderer.info.render.calls,tris:renderer.info.render.triangles,sounds:Object.keys(SND.buf).sort().join(' ')})});
+  btn('กดติดตาม',()=>{followDone.delete(me);follow(me)},'#c0394b');btn('พลุ',()=>show(8,{heart:true}),'#5a3a7a');btn('คนเข้าใหม่',()=>{const n=FAKE2.find(x=>!greeted.has(x))||pick(FAKE2)+' '+(greeted.size+1);welcome(n)},'#3a5a7a');const cb=btn('คนดูจำลอง: ปิด',()=>{crowdOn=!crowdOn;cb.textContent='คนดูจำลอง: '+(crowdOn?'เปิด':'ปิด')});document.body.appendChild(bar)}
+Object.assign(window,{comment,like,gift,follow,show,rocket,burst,welcome,P,_dev:{scene,renderer,composer,bloom,fwMat,THREE},dbg:()=>({mc:{said:MC.said||0,q:MC.q.length},honor:!!honor,top:RK.top.map(p=>p.name+' '+faith(p)).join(', '),music:MUS.next>0,audio:SND.ctx&&SND.ctx.state,lanterns:lanterns.length,walkers:walkers.length,fireworks:fireworks.length,quality,fps:Math.round(fpsNow),calls:renderer.info.render.calls,tris:renderer.info.render.triangles,sounds:Object.keys(SND.buf).sort().join(' ')})});
 
 // ---------- ข้อมูลจริงจาก server.js ----------
 const ids={},used={};
 function nameFor(id,name){if(ids[id])return ids[id];let n=clean(name)?name:'ผู้ใช้',i=2;const base=n;while(used[n]&&used[n]!==id)n=`${base}${i++}`;used[n]=id;return ids[id]=n}
 function onLive(ev){if(ev.type==='status'){live={...live,...ev};return}if(ev.type==='control')return;const name=ev.id?nameFor(ev.id,ev.name):ev.name;
-  if(ev.type==='chat')comment(name,ev.text,ev.pic);else if(ev.type==='like')like(name,ev.count||1,ev.pic);else if(ev.type==='gift')gift(name,ev.coins||1,ev.giftId,ev.img,ev.pic);else if(ev.type==='follow')follow(name,ev.pic,ev.repeat)}
+  if(ev.type==='chat')comment(name,ev.text,ev.pic);else if(ev.type==='like')like(name,ev.count||1,ev.pic);else if(ev.type==='gift')gift(name,ev.coins||1,ev.giftId,ev.img,ev.pic);else if(ev.type==='follow')follow(name,ev.pic,ev.repeat);else if(ev.type==='join')welcome(name)}
 if(!DEMO){let wsT=0;const open=()=>{const ws=new WebSocket(`ws://${location.host}/ws`);ws.onmessage=m=>{try{onLive(JSON.parse(m.data))}catch(e){console.error(e)}};ws.onclose=()=>{live.state='server';clearTimeout(wsT);wsT=setTimeout(open,2000)}};open()}
 
 // ---------- loop ----------
 let last=performance.now(),errN=0;
 // ถ้าเครื่องวาดไม่ทัน (ต่ำกว่า 34 เฟรมต่อวินาที) ลดความละเอียดก่อน แล้วค่อยปิดแสงฟุ้ง
-let fpsN=0,fpsT0=performance.now(),quality=0,fpsNow=0;
-function fpsGuard(){fpsN++;const now=performance.now();if(now-fpsT0<4000)return;fpsNow=fpsN*1000/(now-fpsT0);fpsN=0;fpsT0=now;
-  if(NOW>10&&fpsNow<34&&quality<2&&document.visibilityState==='visible'){quality++;if(quality===1){renderer.setPixelRatio(0.75);composer.setPixelRatio(0.75)}else bloom.enabled=false;console.log('ลดคุณภาพภาพระดับ '+quality+' ('+fpsNow.toFixed(0)+' fps)')}}
+let fpsN=0,fpsT0=performance.now(),quality=0,fpsNow=0,lowN=0;
+function fpsGuard(){fpsN++;const now=performance.now();if(now-fpsT0<2000)return;fpsNow=fpsN*1000/(now-fpsT0);fpsN=0;fpsT0=now;
+  if(honor||NOW<10||document.visibilityState!=='visible'){lowN=0;return}lowN=fpsNow<34?lowN+1:0;
+  if(lowN>=3&&quality<2){lowN=0;quality++;if(quality===1){renderer.setPixelRatio(0.75);composer.setPixelRatio(0.75)}else bloom.enabled=false;console.log('ลดคุณภาพภาพระดับ '+quality+' ('+fpsNow.toFixed(0)+' fps)')}}
 function loop(t){requestAnimationFrame(loop);const dt=Math.min(0.05,(t-last)/1000);last=t;NOW+=dt;
   try{if(MODEL){modelView.items.forEach(o=>{if(!Q.has('still'))o.g.rotation.y+=dt*0.4;const f=0.85+0.12*Math.sin(NOW*13);o.flame.scale.set(0.42*(0.8+0.25*f),0.66*(0.7+0.4*f),1)});renderer.info.reset();renderer.render(modelView.ms,modelView.cam);g.clearRect(0,0,W,H);return}
     if(crowdOn)sim();attract(dt);updScene(dt);updLanterns(dt);updFireworks(dt);musicTick();fpsGuard();
-    camera.position.x=Math.sin(NOW*0.07)*1.2;camera.position.y=4.5+Math.sin(NOW*0.11)*0.3;camera.lookAt(LOOK);
+    updCamera(dt);
     renderer.info.reset();composer.render();drawOverlay()}catch(e){if(errN++<5)console.error(e)}}
-document.fonts.load('700 40px Kanit').finally(()=>requestAnimationFrame(loop));
+const KEEP=[];
+function prewarm(){if(MODEL)return;const t0=performance.now();try{const tmp=[];
+  Object.keys(KIND).forEach((k,i)=>{const o=buildLantern(k);o.g.position.set(-8+i*4,14,-40);scene.add(o.g);tmp.push(o.g);KEEP.push(o)});
+  const pw=makePerson({viewer:true,item:'balloon'});pw.g.position.set(0,0,SHORE-3);scene.add(pw.g);tmp.push(pw.g);KEEP.push(pw);
+  const was=PRESIM;PRESIM=true;FW_TYPES.concat('heart').forEach((t,i)=>burst(-12+i*4,30,-80,t,i));rocket({whistle:false});PRESIM=was;
+  updFireworks(0.016);renderer.info.reset();composer.render();
+  tmp.forEach(o=>scene.remove(o));fireworks.forEach(f=>{if(!f.done)dropFw(f)});fireworks=[];flashAmt=0;ambFw=rnd(9,16)}catch(e){console.error('prewarm',e)}
+  console.log('อุ่นเครื่อง '+(performance.now()-t0).toFixed(0)+' ms')}
+document.fonts.load('700 40px Kanit').finally(()=>{prewarm();last=performance.now();requestAnimationFrame(loop)});
 </script></body></html>
