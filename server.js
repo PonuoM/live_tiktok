@@ -23,23 +23,44 @@ if (!USER && !DEMO) { console.log('ใช้: node server.js <ชื่อบั
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   try { if (await handleSound(req, res, url)) return; } catch (e) { console.log('sound:', String(e.message || e).slice(0, 120)); if (!res.headersSent) { res.writeHead(500); return res.end(); } }
-  // หน้าแรก = ป้อมสุดท้าย (ทาวเวอร์ดีเฟนซ์)  /ghost = ร้านผีกะศุกร์13 เวอร์ชันแรก
-  const page = { '/': 'defense.html', '/index.html': 'defense.html', '/ghost': 'game.html', '/dig': 'dig.html' }[url.pathname];
-  // สถิติความลึกของเกมขุดสมบัติ เก็บข้ามไลฟ์ (รับแค่ตัวเลขที่มากขึ้น)
-  if (url.pathname === '/dig-record') {
-    const f = path.join(DIR, 'dig-record.json');
-    let rec = { best: 0 }; try { rec = JSON.parse(fs.readFileSync(f, 'utf8')); } catch {}
-    if (req.method === 'POST') {
-      let body = ''; for await (const ch of req) { body += ch; if (body.length > 200) break; }
-      const best = Math.floor(+(JSON.parse(body || '{}').best) || 0);
+  // ---------- คลังเกม ----------
+  //   /            เกมที่ตั้งเป็นเกมไลฟ์ (เลือกใน /lib) หน้านี้รีโหลดเองเมื่อเปลี่ยนเกม ใส่ลิงก์นี้ใน LIVE Studio ครั้งเดียวพอ
+  //   /lib         หน้าคลังเกม ลองเล่น ดูตัวอย่าง และตั้งเกมไลฟ์
+  //   /play/<id>   เปิดเกมนั้นตรงๆ (ชื่อเดิม /dig /versus /ghost ยังใช้ได้)
+  const GAMES = JSON.parse(fs.readFileSync(path.join(DIR, "games.json"), "utf8"));
+  const ACTIVE_F = path.join(DIR, "active-game.json");
+  const active = () => { try { const id = JSON.parse(fs.readFileSync(ACTIVE_F, "utf8")).id; if (GAMES.some(g => g.id === id)) return id; } catch {} return GAMES[0].id; };
+  if (url.pathname === "/games") { res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" }); return res.end(JSON.stringify({ games: GAMES, active: active() })); }
+  if (url.pathname === "/active") {
+    if (req.method === "POST") { let body = ""; for await (const ch of req) { body += ch; if (body.length > 200) break; }
+      const id = String(JSON.parse(body || "{}").id || ""); if (GAMES.some(g => g.id === id)) { fs.writeFileSync(ACTIVE_F, JSON.stringify({ id })); console.log("เปลี่ยนเกมไลฟ์เป็น", id); } }
+    res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" }); return res.end(JSON.stringify({ active: active() }));
+  }
+  // สถิติข้ามไลฟ์ของแต่ละเกม (รับแค่ตัวเลขที่มากขึ้น) /dig-record เป็นชื่อเดิมของเกมขุด
+  const rm = url.pathname === "/dig-record" ? ["", "dig"] : url.pathname.match(/^\/record\/([a-z]+)$/);
+  if (rm && GAMES.some(g => g.id === rm[1])) {
+    const f = path.join(DIR, rm[1] === "dig" ? "dig-record.json" : `record-${rm[1]}.json`);
+    let rec = { best: 0 }; try { rec = JSON.parse(fs.readFileSync(f, "utf8")); } catch {}
+    if (req.method === "POST") {
+      let body = ""; for await (const ch of req) { body += ch; if (body.length > 200) break; }
+      const best = Math.floor(+(JSON.parse(body || "{}").best) || 0);
       if (best > (rec.best || 0) && best < 100000) { rec = { best, date: new Date().toISOString() }; fs.writeFileSync(f, JSON.stringify(rec)); }
     }
-    res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+    res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
     return res.end(JSON.stringify(rec));
   }
+  const alias = { "/dig": "dig", "/versus": "versus", "/ghost": "ghost" }[url.pathname];
+  const pm = url.pathname.match(/^\/play\/([a-z]+)$/);
+  const isLive = url.pathname === "/" || url.pathname === "/index.html";
+  const gid = isLive ? active() : alias || (pm && pm[1]);
+  const game = GAMES.find(g => g.id === gid);
+  const page = url.pathname === "/lib" ? "library.html" : game && game.file;
   if (page) {
-    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
-    return fs.createReadStream(path.join(DIR, page)).pipe(res);
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
+    let html = fs.readFileSync(path.join(DIR, page), "utf8");
+    // หน้าไลฟ์: เช็คทุก 5 วิ ถ้าเปลี่ยนเกมในคลังแล้ว โหลดเกมใหม่เอง ไม่ต้องไปกด Refresh ใน LIVE Studio
+    if (isLive) html = html.replace("</body>", `<script>setInterval(()=>fetch("/active").then(r=>r.json()).then(d=>{if(d.active!==${JSON.stringify(gid)})location.reload()}).catch(()=>{}),5000)</script></body>`);
+    return res.end(html);
   }
   // ไอคอนของขวัญที่เก็บไว้ (เฉพาะชื่อไฟล์ในโฟลเดอร์ gifts กันอ่านไฟล์อื่น)
   const m = url.pathname.match(/^\/gifts\/([\w-]+\.(png|json))$/);

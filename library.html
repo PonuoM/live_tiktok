@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>คลังเกมไลฟ์</title>
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#14161b;--card:#1d2027;--line:#2c313b;--txt:#e9e6dc;--dim:#9aa0aa;--gold:#f0c86a;--live:#e5566b;--ok:#7fb85a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font:400 16px/1.5 Kanit,Tahoma,sans-serif}
+main{max-width:860px;margin:0 auto;padding:28px 16px 60px}
+h1{font-size:30px;margin:0 0 4px}
+.sub{color:var(--dim);margin:0 0 22px}
+.how{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 18px;margin-bottom:24px}
+.how code{background:#0d0f13;color:var(--gold);padding:2px 8px;border-radius:6px;font-size:15px}
+.grid{display:grid;gap:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;display:grid;gap:8px}
+.card.on{border-color:var(--live);box-shadow:0 0 0 2px rgba(229,86,107,.35)}
+.top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.top h2{margin:0;font-size:22px}
+.tag{font-size:13px;padding:2px 10px;border-radius:99px;background:#2a2e37;color:var(--dim)}
+.tag.live{background:var(--live);color:#fff;font-weight:600}
+.desc{color:#cfccc2;margin:0}
+.rule{color:var(--gold);font-weight:600}
+.btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+button,a.b{font:600 15px Kanit,Tahoma,sans-serif;border:0;border-radius:10px;padding:9px 14px;cursor:pointer;text-decoration:none;color:#fff;background:#3a3f48}
+button.go{background:var(--live)}
+button:disabled{opacity:.45;cursor:default}
+a.b.test{background:#4a7a3a}
+#msg{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#0d0f13;border:1px solid var(--live);padding:10px 18px;border-radius:12px;opacity:0;transition:.3s}
+#msg.show{opacity:1}
+</style></head><body><main>
+<h1>คลังเกมไลฟ์</h1>
+<p class="sub">เลือกเกมที่จะใช้ไลฟ์ กดครั้งเดียว หน้าไลฟ์เปลี่ยนเกมเองภายใน 5 วินาที</p>
+<div class="how">ใน LIVE Studio ใส่ลิงก์ <code>http://127.0.0.1:4192/</code> ครั้งเดียวพอ ลิงก์นี้จะเปิดเกมที่ติดป้าย <b style="color:var(--live)">กำลังใช้ไลฟ์</b> เสมอ</div>
+<div class="grid" id="list"></div>
+</main><div id="msg"></div>
+<script>
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function toast(t){const m=document.getElementById('msg');m.textContent=t;m.classList.add('show');setTimeout(()=>m.classList.remove('show'),2200)}
+async function load(){const d=await fetch('/games').then(r=>r.json());
+  document.getElementById('list').innerHTML=d.games.map(g=>{const on=g.id===d.active;return `<div class="card${on?' on':''}">
+    <div class="top"><h2>${esc(g.title)}</h2>${on?'<span class="tag live">กำลังใช้ไลฟ์</span>':''}<span class="tag">${esc(g.status||'')}</span></div>
+    <p class="desc">${esc(g.desc)}</p><div class="rule">${esc(g.how)}</div>
+    <div class="btns"><button class="go" data-id="${g.id}" ${on?'disabled':''}>${on?'ใช้อยู่':'ตั้งเป็นเกมไลฟ์'}</button>
+      ${g.test?`<a class="b test" href="/play/${g.id}?test=1" target="_blank">ลองเล่นเอง</a>`:''}
+      <a class="b" href="/play/${g.id}?demo=1" target="_blank">ดูตัวอย่างคนดูจำลอง</a></div></div>`}).join('');
+  document.querySelectorAll('button.go').forEach(b=>b.onclick=async()=>{await fetch('/active',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:b.dataset.id})});toast('เปลี่ยนเกมไลฟ์แล้ว');load()})}
+load();
+</script></body></html>

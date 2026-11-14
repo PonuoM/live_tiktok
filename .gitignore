@@ -22,3 +22,5 @@ followed.json
 *.m4v
 !gifts/*.png
 dig-record.json
+active-game.json
+record-*.json
