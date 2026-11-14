@@ -184,6 +184,14 @@ function splat(x,y,s=1,col='#4f6b2f'){for(let i=0;i<6;i++){D.globalAlpha=0.55;D.
 function scorch(x,y,r){const gr=D.createRadialGradient(x,y,0,x,y,r);gr.addColorStop(0,'rgba(20,14,10,.6)');gr.addColorStop(1,'rgba(20,14,10,0)');D.fillStyle=gr;D.beginPath();D.ellipse(x,y,r,r*0.45,0,0,7);D.fill()}
 
 function activeOf(t){return Object.values(P).filter(p=>p.team===t&&NOW-p.last<IDLE)}
+function realOf(){return activeOf('h').filter(p=>!p.bot)}
+let botN=0;
+const BOT_SHIRT=['#5a6a5a','#6a6a5a','#5a5f6a','#6a5a5a','#5a6a6a','#66604a','#4f5f4f','#5f5a6a','#6a6050','#556066'];
+function setBots(n){botN=Math.max(0,Math.min(10,n|0));
+  for(let i=1;i<=10;i++){const name=`บอท ${i}`;if(i<=botN){if(!P[name]){const p=P[name]={name,team:'h',last:NOW,kills:0,dmg:0,hearts:0,lv:1,shirt:BOT_SHIRT[i-1],helm:HELM[0],bot:true,nextT:NOW+rnd(0.3,1.5)};setLook(p)}}
+    else if(P[name]){P[name].last=-1e9}}}
+function botTick(){for(let i=1;i<=botN;i++){const p=P[`บอท ${i}`];if(!p)continue;p.last=NOW;
+  if(NOW>=p.nextT&&round.state==='play'){p.nextT=NOW+rnd(0.6,1.6);const d=defOf(p.name);if(d)d.q=Math.min(BAL.qCap,d.q+rnd(1,3)*BAL.likeH)}}}
 function smaller(){return activeOf('z').length<activeOf('h').length?'z':'h'}
 function popup(s,x,y,col='#fff',size=34,img=null){pops.push({s,x,y,col,size,img,t:NOW})}
 // ไอคอนของขวัญ: เก็บไว้ที่ /gifts/<id>.png (server.js โหลดเก็บเอง) ถ้ายังไม่มีใช้ลิงก์จาก TikTok
@@ -506,6 +514,7 @@ function giantBoss(){const z=spawnZ('boss',null,540,SPAWN_Y+40);z.hp*=3;z.max=z.
 // ---------- update ----------
 function update(dt){
   if(Q.has('demo')||crowdOn)sim();
+  botTick(dt);
   updCine();updCam(dt);musicTick();
   for(let i=pending.length-1;i>=0;i--)if(NOW>=pending[i].t){const f=pending[i].fn;pending.splice(i,1);if(round.state==='play')f()}
   // คนที่ไม่ขยับเกิน 20 วิ ออกจากจอเอง
@@ -640,7 +649,7 @@ function render(){
 
   // รูปโปรไฟล์ ชื่อ เลเวล (เฉพาะคนที่ยังเล่นอยู่) สลับสูงต่ำกันซ้อน
   g.save();applyCam();
-  const crowd=defs.filter(d=>!d.leave).length>10,top3=new Set(Object.values(P).filter(p=>(p.totK||0)>0).sort((a,b)=>b.totK-a.totK).slice(0,3).map(p=>p.name));
+  const crowd=defs.filter(d=>!d.leave).length>10,top3=new Set(Object.values(P).filter(p=>!p.bot&&(p.totK||0)>0).sort((a,b)=>b.totK-a.totK).slice(0,3).map(p=>p.name));
   defs.slice().sort((a,b)=>(a.oy||0)-(b.oy||0)).forEach(d=>{if(d.leave||!d.p||d.downUntil>NOW)return;const hot=NOW-(d.p.boostT||-9)<2.5||(d.say&&NOW-d.sayT<3)||top3.has(d.name);if(crowd&&!hot)return;const top=SY(d)+30-18*PX*hScale(d.p),ny=top-8-(crowd?0:(d.slot%2)*26)+(d.oy?14:0);
     txt(short(d.name,8)+(d.p.lv>1?` Lv${d.p.lv}`:''),d.x,ny,NOW-(d.p.boostT||-9)<2.5?28:23,d.p.lv>=5||NOW-(d.p.boostT||-9)<2.5?'#f0c86a':'#fff','center',700);
     if(d.p.boostT&&NOW-d.p.boostT<2.5){const k=NOW-d.p.boostT;g.globalAlpha=Math.min(1,(2.5-k)*2);glow(d.x,SY(d)-40,90,'rgba(255,220,120,1)',0.4*(1-k/2.5));
@@ -662,7 +671,7 @@ function render(){
   const wv=round.wall/MAXWALL;g.fillStyle='#222';g.fillRect(130,SAFE_T+66,904,28);g.fillStyle=wv<0.3?'#d9473b':wv<0.6?'#e09a4a':'#7fb85a';g.fillRect(133,SAFE_T+69,898*wv,22);
   txt(`${Math.ceil(round.wall)}`,582,SAFE_T+89,22,'#fff','center',600);
   {const y0=SAFE_T+112;panel(16,y0,1048,118,'#8cc8ff',0.86);
-    heart(56,y0+34,40);txt('กดหัวใจ = ยิงซอมบี้',94,y0+48,40,'#fff','left',700);txt(`ทหาร ${activeOf('h').length} คน${lose.h?'  บัฟ +'+Math.round((buff('h')-1)*100)+'%':''}`,1040,y0+44,24,'#8cc8ff','right',600);
+    heart(56,y0+34,40);txt('กดหัวใจ = ยิงซอมบี้',94,y0+48,40,'#fff','left',700);txt(`ทหาร ${realOf().length} คน${botN?` + บอท ${botN}`:''}${lose.h?'  บัฟ +'+Math.round((buff('h')-1)*100)+'%':''}`,1040,y0+44,24,'#8cc8ff','right',600);
     const items=[[TIERS[0].id,'ระเบิด'],[TIERS[1].id,'ปืนกล'],[TIERS[2].id,'เครื่องบิน'],[TIERS[3].id,'รถถัง'],[null,'ติดตาม = ระเบิดฟรี']];
     txt('ของขวัญ =',36,y0+100,24,'#cfcfcf','left',600);
     items.forEach(([id,n],i)=>{const x=170+i*170;if(id){drawImg(GIMG[id],x,y0+90,40);txt(n,x+26,y0+100,24,'#f0c86a','left',700)}else txt(n,x-10,y0+100,22,'#ff9aa8','left',700)})}
@@ -682,7 +691,7 @@ function render(){
   drawCine();
 
   // ---- อันดับ Top 3 ยิงตายสะสมทั้งไลฟ์ การ์ดใหญ่ในลานใต้กำแพง ----
-  {const top=Object.values(P).filter(p=>(p.totK||0)>0).sort((a,b)=>b.totK-a.totK).slice(0,3),y=1284;
+  {const top=Object.values(P).filter(p=>!p.bot&&(p.totK||0)>0).sort((a,b)=>b.totK-a.totK).slice(0,3),y=1284;
     if(!top.length){panel(16,y,1048,108,'#e8c547',0.82);txt('TOP มือปืน',540,y+40,28,'#e8c547','center');txt('ยังไม่มีใครยิงซอมบี้ตาย กดหัวใจเลย!',540,y+86,30,'#fff','center',600)}
     top.forEach((p,i)=>{const x0=16+i*352,cc=['#e8c547','#d0d6dc','#c98a52'][i];panel(x0,y,344,108,cc,0.88);
       g.fillStyle=cc;g.beginPath();g.arc(x0+30,y+54,20,0,7);g.fill();txt(`${i+1}`,x0+30,y+65,28,'#1a1408','center',700,cc);
@@ -761,11 +770,12 @@ function control(c){const a=c.arg;
   else if(c.cmd==='wxlock')wxLock=WX[a]?a:null;
   else if(c.cmd==='event'&&round.state==='play'){if(a==='giant')giantBoss();else if(EVS[a]){evWarn={k:a,t:NOW+3};banner('ระวัง! '+EVS[a].n,EVS[a].col,EVS[a].sub)}}
   else if(c.cmd==='autoev')autoEv=!!a;
+  else if(c.cmd==='bots')setBots(+a);
   else if(c.cmd==='reload')location.reload();
   sendState()}
 let wsRef=null;
 function sendState(){if(!wsRef||wsRef.readyState!==1)return;const ps=activeOf('h');
-  wsRef.send(JSON.stringify({type:'state',game:'siege',state:paused?'paused':round.state,wave:round.n,left:Math.max(0,Math.ceil(ROUND-(NOW-round.t0))),wall:Math.round(round.wall),players:ps.length,zombies:zs.filter(z=>z.hp>0).length,weather:wx,wxLock,autoEv,best,live:live.state}))}
+  wsRef.send(JSON.stringify({type:'state',game:'siege',state:paused?'paused':round.state,wave:round.n,left:Math.max(0,Math.ceil(ROUND-(NOW-round.t0))),wall:Math.round(round.wall),players:ps.filter(p=>!p.bot).length,bots:botN,zombies:zs.filter(z=>z.hp>0).length,weather:wx,wxLock,autoEv,best,live:live.state}))}
 setInterval(sendState,1000);
 function onLive(ev){
   if(ev.type==='status'){live={...live,...ev};return}

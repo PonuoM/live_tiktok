@@ -49,6 +49,9 @@ input{font:600 16px Kanit;width:80px;padding:10px;border-radius:10px;border:1px 
 <button class="pur" data-c="event" data-a="frenzy">ฝูงคลั่ง</button><button class="pur" data-c="event" data-a="boss">บอส</button><button class="red" data-c="event" data-a="giant">บอสใหญ่</button></div>
 <div class="row" style="margin-top:10px">เหตุการณ์สุ่มอัตโนมัติ: <button id="autoOn" data-c="autoev" data-a="1">เปิด</button><button id="autoOff" data-c="autoev" data-a="0">ปิด</button></div></section>
 
+<section><h2>ทหารบอท (ช่วยยิงเอง ให้จอดูคึกคักตอนคนน้อย)</h2>
+<div class="row" id="bots"></div>
+<p class="note">ชื่อขึ้นว่า "บอท 1" "บอท 2" ไม่ปลอมเป็นคนดูจริง ไม่ขึ้นอันดับ และนับแยกจากคนเล่นจริง</p></section>
 <section><h2>อื่นๆ</h2><div class="row"><button data-c="reload">โหลดหน้าเกมใหม่</button></div></section>
 </main><div id="msg"></div>
 <script>
@@ -56,15 +59,17 @@ const WX={clear:'ฟ้าปกติ',sun:'แดดจัด',rain:'ฝน',s
 const STATE={lobby:'รอเริ่มเกม',play:'กำลังเล่น',end:'จบคลื่น',paused:'หยุดชั่วคราว'};
 document.getElementById('wx').innerHTML=Object.entries(WX).map(([k,n])=>`<button class="blue" data-c="weather" data-a="${k}">${n}</button>`).join('');
 document.getElementById('lock').innerHTML=`<button data-c="wxlock" data-a="">ไม่ล็อก</button>`+Object.entries(WX).map(([k,n])=>`<button data-c="wxlock" data-a="${k}">${n}</button>`).join('');
+document.getElementById('bots').innerHTML=[0,2,4,6,8,10].map(n=>`<button data-c="bots" data-a="${n}">${n?n+' ตัว':'ไม่มีบอท'}</button>`).join('');
 function toast(t){const m=document.getElementById('msg');m.textContent=t;m.classList.add('show');setTimeout(()=>m.classList.remove('show'),1600)}
 async function send(cmd,arg){const r=await fetch('/control',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({cmd,arg})}).catch(()=>null);toast(r&&r.ok?'ส่งคำสั่งแล้ว':'ส่งไม่ได้ ตรวจว่า server.js ยังเปิดอยู่');setTimeout(poll,300)}
 document.addEventListener('click',e=>{const b=e.target.closest('button[data-c]');if(!b)return;let a=b.dataset.a;if(b.dataset.c==='autoev')a=a==='1';send(b.dataset.c,a)});
 document.getElementById('goWave').onclick=()=>send('start',Math.max(1,+document.getElementById('wave').value||1));
 async function poll(){const d=await fetch('/state').then(r=>r.json()).catch(()=>null),el=document.getElementById('stat'),note=document.getElementById('note');
   if(!d||!d.state){el.innerHTML='<div><b class="off">ไม่เจอหน้าเกม</b><span>เปิดลิงก์ / ใน LIVE Studio หรือเบราว์เซอร์ก่อน</span></div>';note.textContent=d?`ไลฟ์: ${d.live.state}`:'ติดต่อ server.js ไม่ได้';return}
-  const s=d.state;el.innerHTML=[[STATE[s.state]||s.state,'สถานะ'],[s.wave,'คลื่น'],[s.state==='play'?s.left+' วิ':'-','เหลือ'],[s.wall,'กำแพง'],[s.players,'คนเล่น'],[s.zombies,'ซอมบี้'],[WX[s.weather]||s.weather,'อากาศ'],[s.best||'-','สถิติคลื่น']].map(([v,k])=>`<div><b>${v}</b><span>${k}</span></div>`).join('');
+  const s=d.state;el.innerHTML=[[STATE[s.state]||s.state,'สถานะ'],[s.wave,'คลื่น'],[s.state==='play'?s.left+' วิ':'-','เหลือ'],[s.wall,'กำแพง'],[s.players,'คนเล่นจริง'],[s.bots||0,'บอท'],[s.zombies,'ซอมบี้'],[WX[s.weather]||s.weather,'อากาศ'],[s.best||'-','สถิติคลื่น']].map(([v,k])=>`<div><b>${v}</b><span>${k}</span></div>`).join('');
   note.textContent=`ไลฟ์: ${({live:'ต่ออยู่',offline:'ยังไม่ได้ไลฟ์',connecting:'กำลังต่อ',error:'ต่อไม่ได้'})[s.live]||s.live}  |  เหตุการณ์อัตโนมัติ: ${s.autoEv?'เปิด':'ปิด'}  |  ล็อกอากาศ: ${s.wxLock?WX[s.wxLock]:'ไม่ล็อก'}`;
   document.querySelectorAll('[data-c="wxlock"]').forEach(b=>b.classList.toggle('on',(b.dataset.a||null)===(s.wxLock||null)));
+  document.querySelectorAll('[data-c="bots"]').forEach(b=>b.classList.toggle('on',+b.dataset.a===(s.bots||0)));
   document.getElementById('autoOn').classList.toggle('on',s.autoEv);document.getElementById('autoOff').classList.toggle('on',!s.autoEv)}
 poll();setInterval(poll,1000);
 </script></body></html>
