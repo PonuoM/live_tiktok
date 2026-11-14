@@ -82,17 +82,21 @@ const server = http.createServer(async (req, res) => {
   if (url.pathname === '/favicon.ico') { res.writeHead(204); return res.end(); }
   res.writeHead(404); res.end();
 });
-const wss = new WebSocketServer({ server, path: '/ws' });
+// เปิดรับทั้ง 127.0.0.1 และ ::1 เพื่อให้ http://localhost:4192/ ใช้ได้ทุกโปรแกรม (LIVE Studio ไม่รับลิงก์ที่เป็นเลข IP)
+// ยังรับเฉพาะในเครื่องนี้ ไม่เปิดให้เครื่องอื่นในวง LAN
+const server6 = http.createServer(server.listeners('request')[0]);
+const wsss = [new WebSocketServer({ server, path: '/ws' }), new WebSocketServer({ server: server6, path: '/ws' })];
 let status = { type: 'status', state: DEMO ? 'demo' : 'connecting', user: USER, viewers: 0 };
-const send = ev => { const s = JSON.stringify(ev); wss.clients.forEach(c => c.readyState === 1 && c.send(s)); };
+const send = ev => { const s = JSON.stringify(ev); wsss.forEach(w => w.clients.forEach(c => c.readyState === 1 && c.send(s))); };
 // หน้าเกมรายงานสถานะกลับมาทุกวินาที หน้าควบคุมอ่านจาก /state
 let gameState = null;
-wss.on('connection', ws => {
+wsss.forEach(w => w.on('connection', ws => {
   ws.send(JSON.stringify(status));
   ws.on('message', m => { try { const d = JSON.parse(String(m)); if (d.type === 'state') gameState = { ...d, at: Date.now() }; } catch {} });
-});
+}));
 const setStatus = patch => { status = { ...status, ...patch }; send(status); };
-server.listen(PORT, '127.0.0.1', () => console.log(`หน้าเกม: http://127.0.0.1:${PORT}/${DEMO ? '?demo=1' : ''}`));
+server.listen(PORT, '127.0.0.1', () => console.log(`หน้าเกม: http://localhost:${PORT}/${DEMO ? '?demo=1' : ''}   ควบคุม: http://localhost:${PORT}/control   คลังเกม: http://localhost:${PORT}/lib`));
+server6.on('error', () => {}); server6.listen(PORT, '::1');
 
 if (DEMO) { console.log('โหมดจำลอง ไม่ต่อไลฟ์'); }
 else startLive();
