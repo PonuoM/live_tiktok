@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="th"><head><meta charset="utf-8">
+<title>โคมขอพร LIVE</title>
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@500;700&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#000;height:100%;overflow:hidden;display:flex;align-items:center;justify-content:center}
+#wrap{position:relative;height:100vh;aspect-ratio:9/16}
+#wrap canvas{position:absolute;inset:0;width:100%;height:100%}
+#ui{pointer-events:none}
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+</head><body><div id="wrap"><canvas id="gl"></canvas><canvas id="ui" width="1080" height="1920"></canvas></div>
+<script type="module">
+// ===== โคมขอพร: พิมพ์คำอธิษฐาน = ปล่อยโคมที่มีรูปโปรไฟล์และชื่อของตัวเองลอยขึ้นฟ้า กดหัวใจ = โคมสว่างและลอยเร็วขึ้น =====
+// ไม่มีแพ้ ไม่มีกติกาให้จำ ฉากสามมิติด้วย three.js (โหลดจาก jsDelivr ต้องต่ออินเทอร์เน็ต)
+// ของขวัญเป็นของตกแต่ง (โคมพิเศษ พลุ) ไม่ผูกกับบุญหรือผลทางศาสนา ไม่มีพระหรือพระพุทธรูปในฉาก
+// ?demo=1 คนดูจำลอง  ?test=1 เล่นเองด้วยปุ่ม  ?safe=1 ระบายส่วนที่ UI ของ TikTok บัง
+import * as THREE from 'three';
+import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';
+import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
+import {UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';
+import {OutputPass} from 'three/addons/postprocessing/OutputPass.js';
+import {Reflector} from 'three/addons/objects/Reflector.js';
+
+const Q=new URLSearchParams(location.search),DEMO=Q.has('demo')||Q.has('test'),SHOWSAFE=Q.has('safe');
+const W=1080,H=1920,FONT='Kanit, Tahoma, sans-serif',SAFE_T=72,SAFE_B=1390,IDLE=25;
+const rnd=(a,b)=>a+Math.random()*(b-a),pick=a=>a[Math.random()*a.length|0],clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const short=(s,n=10)=>s.length>n?s.slice(0,n)+'…':s;
+const ease={out:k=>1-(1-k)*(1-k),back:k=>{const c=1.7;k-=1;return 1+k*k*((c+1)*k+c)}};
+let NOW=0,live={state:DEMO?'demo':'connecting'};
+
+// ---------- ฉากสามมิติ ----------
+const renderer=new THREE.WebGLRenderer({canvas:document.getElementById('gl'),antialias:true});
+renderer.setPixelRatio(1);renderer.setSize(W,H,false);renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=0.85;
+const scene=new THREE.Scene();scene.fog=new THREE.FogExp2(0x2e2a5a,0.0065);
+const camera=new THREE.PerspectiveCamera(58,W/H,0.1,1200);camera.position.set(0,5,34);
+const LOOK=new THREE.Vector3(0,17,-10);camera.lookAt(LOOK);
+
+// ท้องฟ้าค่ำ: น้ำเงินครามด้านบน ม่วงกลาง ชมพูส้มที่ขอบฟ้า (สว่างพอ ไม่มืดทึบ)
+scene.add(new THREE.Mesh(new THREE.SphereGeometry(600,32,16),new THREE.ShaderMaterial({side:THREE.BackSide,depthWrite:false,fog:false,
+  uniforms:{top:{value:new THREE.Color(0x182056)},mid:{value:new THREE.Color(0x46408a)},hor:{value:new THREE.Color(0xd98a8a)}},
+  vertexShader:'varying vec3 vP;void main(){vP=normalize(position);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
+  fragmentShader:'uniform vec3 top,mid,hor;varying vec3 vP;void main(){float h=vP.y;vec3 c=h>0.12?mix(mid,top,smoothstep(.12,.7,h)):mix(hor,mid,smoothstep(-.02,.12,h));if(h<-.02)c=mid*.6;gl_FragColor=vec4(c,1.);}'})));
+// ดาว
+{const n=1400,p=new Float32Array(n*3);for(let i=0;i<n;i++){const a=Math.random()*Math.PI*2,e=0.12+Math.random()*0.85,r=520;p[i*3]=Math.cos(a)*Math.cos(e)*r;p[i*3+1]=Math.sin(e)*r;p[i*3+2]=Math.sin(a)*Math.cos(e)*r}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(p,3));scene.add(new THREE.Points(g,new THREE.PointsMaterial({color:0xffffff,size:2,sizeAttenuation:false,transparent:true,opacity:.85,fog:false})))}
+// ภาพเรืองแสงทรงกลม (ใช้กับโคม พระจันทร์ หิ่งห้อย)
+const glowTex=(()=>{const c=document.createElement('canvas');c.width=c.height=128;const x=c.getContext('2d'),g=x.createRadialGradient(64,64,0,64,64,64);
+  g.addColorStop(0,'rgba(255,255,255,1)');g.addColorStop(0.25,'rgba(255,255,255,.55)');g.addColorStop(1,'rgba(255,255,255,0)');x.fillStyle=g;x.fillRect(0,0,128,128);return new THREE.CanvasTexture(c)})();
+function glowSprite(color,s,op=1){const m=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex,color,transparent:true,opacity:op,blending:THREE.AdditiveBlending,depthWrite:false}));m.scale.set(s,s,1);return m}
+// พระจันทร์
+{const m=new THREE.Mesh(new THREE.SphereGeometry(9,24,16),new THREE.MeshBasicMaterial({color:0xfff1d0,fog:false}));m.position.set(-70,140,-320);scene.add(m);const gl=glowSprite(0xffe8c0,45,.3);gl.position.copy(m.position);gl.material.fog=false;scene.add(gl)}
+// ภูเขาสามชั้น
+function ridge(z,color,h,seed){const s=new THREE.Shape();s.moveTo(-500,-5);for(let x=-500;x<=500;x+=10){const y=h*(0.5+0.3*Math.sin(x*0.013+seed)+0.2*Math.sin(x*0.031+seed*2)+0.08*Math.sin(x*0.09+seed*3));s.lineTo(x,Math.max(0,y))}s.lineTo(500,-5);
+  const m=new THREE.Mesh(new THREE.ShapeGeometry(s),new THREE.MeshBasicMaterial({color}));m.position.z=z;scene.add(m)}
+ridge(-260,0x3a3470,70,1.3);ridge(-170,0x2c2858,46,4.1);ridge(-110,0x221f46,26,7.7);
+// ผิวน้ำสะท้อนโคม
+{const wtr=new Reflector(new THREE.PlaneGeometry(900,900),{textureWidth:540,textureHeight:960,color:0x8890b8,clipBias:0.003});wtr.rotation.x=-Math.PI/2;scene.add(wtr);
+  const tint=new THREE.Mesh(new THREE.PlaneGeometry(900,900),new THREE.MeshBasicMaterial({color:0x1a1c3c,transparent:true,opacity:.45,depthWrite:false}));tint.rotation.x=-Math.PI/2;tint.position.y=0.02;scene.add(tint)}
+// ท่าน้ำไม้ทางขวา (โคมปล่อยจากตรงนี้ ไม่ทับแถบคอมเมนต์ล่างซ้าย) ต้นไม้เงา
+const wood=new THREE.MeshStandardMaterial({color:0x3b2b22,roughness:1});
+{const d=new THREE.Mesh(new THREE.BoxGeometry(5,0.25,7),wood);d.position.set(6,0.7,-2);scene.add(d);for(const [x,z] of [[4,-5],[8,-5],[4,1],[8,1]]){const p=new THREE.Mesh(new THREE.CylinderGeometry(.18,.18,2.2,6),wood);p.position.set(x,0,z);scene.add(p)}}
+{const leaf=new THREE.MeshStandardMaterial({color:0x151a2a,roughness:1});for(const [x,z,s] of [[-17,12,1.4],[-21,4,1.8],[-13,0,1.1],[16,4,1.5],[21,-4,1.9],[-26,-8,2.2],[25,12,1.3]]){const t=new THREE.Mesh(new THREE.ConeGeometry(2.2*s,7*s,7),leaf);t.position.set(x,3.5*s,z);scene.add(t)}}
+scene.add(new THREE.HemisphereLight(0x8a90d0,0x1a1830,1.1));
+const warm=new THREE.PointLight(0xffa860,40,60,1.6);warm.position.set(5,5,7);scene.add(warm);
+// หิ่งห้อยเหนือน้ำ
+const flies=[];for(let i=0;i<26;i++){const s=glowSprite(0xffe08a,rnd(.5,.9),.8);s.position.set(rnd(-25,25),rnd(.6,4),rnd(-10,26));s.userData={p:rnd(0,9),b:s.position.clone()};scene.add(s);flies.push(s)}
+
+const composer=new EffectComposer(renderer);composer.setSize(W,H);composer.addPass(new RenderPass(scene,camera));
+const bloom=new UnrealBloomPass(new THREE.Vector2(W/2,H/2),0.55,0.4,0.62);composer.addPass(bloom);composer.addPass(new OutputPass());
+
+// ---------- โคม ----------
+const latheG=new THREE.LatheGeometry([[0.5,0],[0.58,0.08],[0.72,0.55],[0.84,1.25],[0.9,1.75],[0.86,1.82]].map(([x,y])=>new THREE.Vector2(x,y)),16);
+const KIND={plain:{c:0xffd8a0,e:0xff7a20,ei:0.9,s:0.75},flower:{c:0xffc8dc,e:0xff5a8a,ei:1.0,s:0.85},gold:{c:0xffe8a0,e:0xffa010,ei:1.3,s:1.05},giant:{c:0xfff0c0,e:0xffb030,ei:1.5,s:1.35},sample:{c:0xe0d4c0,e:0xff8a40,ei:0.7,s:0.65}};
+let lanterns=[];
+function makeLantern(p,wish,kind='plain',opt={}){const K=KIND[kind],g=new THREE.Group();
+  const mat=new THREE.MeshStandardMaterial({color:K.c,emissive:K.e,emissiveIntensity:K.ei,side:THREE.DoubleSide,roughness:.85,transparent:true,opacity:.96});
+  const body=new THREE.Mesh(latheG,mat);g.add(body);
+  const flame=new THREE.Mesh(new THREE.SphereGeometry(0.16,8,6),new THREE.MeshBasicMaterial({color:0xfff0a0}));flame.position.y=0.15;g.add(flame);
+  const gl=glowSprite(K.e,2.6,0.45);gl.position.y=0.9;g.add(gl);
+  const sc=K.s*(1+Math.min(0.5,(p&&p.hearts||0)/600));g.scale.setScalar(sc);
+  g.position.set(opt.x??rnd(2,10),1.2,opt.z??rnd(-4,4));scene.add(g);
+  const L={g,mat,gl,p,wish,kind,born:NOW,vy:rnd(0.9,1.3)*(kind==='giant'?0.8:1),vx:rnd(-0.55,0.45),ph:rnd(0,9),boost:0,boostT:-9,fade:1,ei:K.ei,sc};
+  lanterns.push(L);if(lanterns.length>70){const o=lanterns.shift();scene.remove(o.g)}return L}
+function updLanterns(dt){for(const L of lanterns){const t=NOW-L.born;L.boost=Math.max(0,L.boost-dt*0.5);
+  const up=L.vy*(t<2?0.4+0.3*t:1)+L.boost*1.8;L.g.position.y+=up*dt;L.g.position.x+=(L.vx+Math.sin(NOW*0.4+L.ph)*0.35)*dt;L.g.position.z-=0.7*dt;
+  L.g.rotation.y+=dt*0.3;L.g.rotation.z=Math.sin(NOW*1.3+L.ph)*0.06;
+  const fl=0.85+0.12*Math.sin(NOW*13+L.ph)+0.06*Math.random();L.mat.emissiveIntensity=L.ei*fl*(1+L.boost*0.6);L.gl.material.opacity=0.45*L.fade*(1+L.boost*0.5);
+  const top=95;if(L.g.position.y>top-15){L.fade=clamp((top-L.g.position.y)/15,0,1);L.mat.opacity=0.96*L.fade}}
+  lanterns=lanterns.filter(L=>{if(L.fade<=0.01){scene.remove(L.g);L.mat.dispose();return false}return true})}
+
+// ---------- พลุ ----------
+let fireworks=[];
+function firework(x,y,z,color){const n=140,pos=new Float32Array(n*3),vel=[];for(let i=0;i<n;i++){pos[i*3]=x;pos[i*3+1]=y;pos[i*3+2]=z;const a=Math.random()*Math.PI*2,b=Math.acos(rnd(-1,1)),s=rnd(5,9);vel.push(new THREE.Vector3(Math.sin(b)*Math.cos(a)*s,Math.cos(b)*s,Math.sin(b)*Math.sin(a)*s))}
+  const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  const m=new THREE.Points(geo,new THREE.PointsMaterial({color,size:0.7,transparent:true,opacity:1,blending:THREE.AdditiveBlending,depthWrite:false,map:glowTex}));scene.add(m);
+  const fl=glowSprite(color,30,0.9);fl.position.set(x,y,z);scene.add(fl);fireworks.push({m,geo,vel,t:NOW,fl});sfx('gift1',0.5)}
+function rocket(color){const x=rnd(-14,14),y=rnd(28,48),z=rnd(-30,-5);const r=glowSprite(0xffe0a0,2.2,1);r.position.set(x*0.4+4,1,6);scene.add(r);fireworks.push({rocket:r,from:r.position.clone(),to:new THREE.Vector3(x,y,z),t:NOW,color})}
+function updFireworks(dt){for(const f of fireworks){const t=NOW-f.t;
+  if(f.rocket){const k=Math.min(1,t/1.1);f.rocket.position.lerpVectors(f.from,f.to,ease.out(k));if(k>=1){scene.remove(f.rocket);f.done=true;firework(f.to.x,f.to.y,f.to.z,f.color)}continue}
+  const a=f.geo.attributes.position;for(let i=0;i<f.vel.length;i++){const v=f.vel[i];v.y-=3*dt;v.multiplyScalar(0.985);a.array[i*3]+=v.x*dt;a.array[i*3+1]+=v.y*dt;a.array[i*3+2]+=v.z*dt}a.needsUpdate=true;
+  f.m.material.opacity=clamp(1.6-t*0.7,0,1);f.fl.material.opacity=Math.max(0,0.9-t*3);if(t>2.4){scene.remove(f.m);scene.remove(f.fl);f.geo.dispose();f.done=true}}
+  fireworks=fireworks.filter(f=>!f.done)}
+function show(n){const C=[0xff6a8a,0xffd04a,0x7fd8ff,0x9fe08a,0xd79cff,0xffffff];for(let i=0;i<n;i++)setTimeout(()=>rocket(pick(C)),i*260)}
+
+// ---------- คนดู ----------
+let P={};
+const SHIRTS=['#a85a4a','#4a6a8a','#8a7a4a','#6a4a7a','#4a7a6a','#9a6a3a'];
+function setPic(p,url){if(!url||p.picUrl===url)return;p.picUrl=url;const im=new Image();im.referrerPolicy='no-referrer';im.src=url;p.pic=im}
+function player(name,pic){let p=P[name];if(!p){p=P[name]={name,hearts:0,last:NOW,lastLantern:-99,shirt:pick(SHIRTS),wishes:0};if(!PRESIM)announce(name)}setPic(p,pic);p.last=NOW;return p}
+// กรองคำหยาบทั้งคำอธิษฐานและชื่อ (คำที่เจอบ่อย เพิ่มได้ในรายการ)
+const BAD=['ควย','เหี้ย','เหี้ย','สัส','สัด','เย็ด','หี','แตด','ไอ้สัตว์','อีสัตว์','ระยำ','ชาติหมา','พ่อมึงตาย','แม่มึงตาย','กระหรี่','ร่าน','fuck','shit','bitch','porn','sex','dick','pussy','nigg'];
+const clean=s=>!BAD.some(b=>String(s).toLowerCase().includes(b));
+const SAMPLE=['ขอให้ทุกคนมีความสุข','ขอให้สอบผ่าน','ขอให้รวยๆ','ขอให้หายป่วยไวๆ','ขอให้ครอบครัวแข็งแรง','ขอให้งานปัง','ขอให้เจอคนดีๆ'];
+function wishText(t){t=String(t||'').replace(/\s+/g,' ').trim();if(!clean(t)||t.replace(/[\d\s.!?]/g,'').length<2)return pick(['ขอให้สมหวัง','ขอให้โชคดี','ขอให้มีความสุข']);return t.slice(0,34)}
+function myLantern(p){for(let i=lanterns.length-1;i>=0;i--)if(lanterns[i].p===p&&lanterns[i].g.position.y<60)return lanterns[i];return null}
+function launch(p,wish,kind='plain',opt){p.lastLantern=NOW;p.wishes++;wishesTotal++;const L=makeLantern(p,wish,kind,opt);sfx(kind==='plain'?'gift1':'gift2',0.55);return L}
+
+// ---------- รับเหตุการณ์ ----------
+let wishesTotal=0,liveHearts=0,msIdx=0,lastChat=-99,banners=[],cards=[],sparks=[];
+const MS_G=i=>[150,400,800,1500,2500][i]??2500+(i-4)*1500;
+function comment(name,text,pic){const p=player(name,pic),w=wishText(text);lastChat=NOW;
+  const L=myLantern(p);if(L&&NOW-p.lastLantern<8){L.wish=w;L.born=Math.min(L.born,NOW-0.01);L.bubbleT=NOW}else launch(p,w)}
+function like(name,n,pic){const p=player(name,pic);p.hearts+=n;liveHearts+=n;let L=myLantern(p);if(!L)L=launch(p,pick(['ขอให้สมหวัง','ขอให้โชคดี','ขอให้มีความสุข']));
+  L.boost=Math.min(3,L.boost+n*0.12);L.boostT=NOW;for(let i=0;i<Math.min(6,n);i++)sparks.push({L,t:NOW+i*0.05,dx:rnd(-40,40)});
+  while(liveHearts>=MS_G(msIdx)){banner(`หัวใจครบ ${MS_G(msIdx).toLocaleString()} ดวง!`,'#ff8aa8','พลุฉลองให้ทุกคน');show(6+Math.min(6,msIdx*2));sfx('win',0.8);msIdx++}}
+const GIMG={};
+function giftImg(id,url){if(!id)return null;if(GIMG[id])return GIMG[id];const im=new Image();im.onerror=()=>{if(url&&im.src!==url)im.src=url};im.src=`/gifts/${id}.png`;return GIMG[id]=im}
+const TIERS=[{id:'5655',c:1,n:'โคมดอกไม้'},{id:'5879',c:30,n:'โคมทอง'},{id:'5660',c:100,n:'โคมยักษ์ + พลุ'},{id:'6267',c:299,n:'ฟ้าเต็มโคม'}];TIERS.forEach(t=>giftImg(t.id));
+function gift(name,coins,giftId,img,pic){const p=player(name,pic);p.hearts+=coins*5;const icon=giftId?giftImg(giftId,img):null,w=myLantern(p)?.wish||'ขอให้สมหวัง';
+  if(coins>=299){launch(p,w,'giant',{x:5,z:-2});for(let i=0;i<10;i++)setTimeout(()=>makeLantern(p,null,'gold'),300+i*180);show(12);card(p,icon,coins,'ฟ้าเต็มโคม');sfx('gift4')}
+  else if(coins>=100){launch(p,w,'giant',{x:5,z:-2});show(5);card(p,icon,coins,'โคมยักษ์');sfx('gift3')}
+  else if(coins>=30){launch(p,w,'gold');sfx('gift2')}
+  else{for(let i=0;i<Math.min(5,coins);i++)setTimeout(()=>launch(p,w,'flower'),i*250);sfx('gift1')}
+  popupAt(myLantern(p),`${coins} เหรียญ`,icon)}
+const followDone=new Set();
+function follow(name,pic,repeat){const p=player(name,pic);if(repeat||followDone.has(name))return;followDone.add(name);launch(p,'ขอบคุณที่กดติดตาม','gold');banner(`ขอบคุณ ${short(name,12)} ที่กดติดตาม`,'#f0c86a','ได้โคมทองฟรี 1 ดวง')}
+function banner(s,col,sub=''){banners.push({s,col,sub,t:Math.max(NOW,...banners.map(b=>b.t+2.4))})}
+function card(p,icon,coins,title){cards.push({p,icon,coins,title,t:Math.max(NOW,...cards.map(c=>c.t+3))})}
+let pops=[];function popupAt(L,s,img){if(!L)return;pops.push({L,s,img,t:NOW})}
+
+// ---------- เสียง (ชุดเดียวกับเกมอื่นในคลัง) ----------
+const SND={ctx:null,buf:{},last:{}};let voices=0,PRESIM=false;
+function sndInit(){try{SND.ctx=new (window.AudioContext||window.webkitAudioContext)()}catch(e){return}const c=SND.ctx;SND.master=c.createGain();SND.master.gain.value=0.9;SND.master.connect(c.destination);
+  SND.bus=c.createGain();const comp=c.createDynamicsCompressor();comp.threshold.value=-18;comp.ratio.value=6;SND.bus.connect(comp).connect(SND.master);
+  fetch('/sounds').then(r=>r.json()).then(d=>{Object.keys(d.list||{}).forEach(k=>{if(!/^(gift\d?|levelup|honor|win)$/.test(k))return;const v=(d.choice||{})[k]||'a';
+    fetch(`/sfx/${k}_${v}.mp3`).then(r=>r.ok?r.arrayBuffer():Promise.reject()).then(b=>c.decodeAudioData(b)).then(a=>{SND.buf[k]=a}).catch(()=>{})})}).catch(()=>{});
+  const resume=()=>{if(SND.ctx.state!=='running')SND.ctx.resume()};addEventListener('pointerdown',resume);addEventListener('keydown',resume)}
+function sfx(k,vol=1){const c=SND.ctx,b=SND.buf[k];if(!c||!b||c.state!=='running'||PRESIM)return;const now=performance.now()/1000;if(SND.last[k]&&now-SND.last[k]<0.12)return;if(voices>10)return;SND.last[k]=now;
+  const s=c.createBufferSource();s.buffer=b;s.playbackRate.value=rnd(0.95,1.08);const g=c.createGain();g.gain.value=vol;s.connect(g).connect(SND.bus);voices++;s.onended=()=>voices--;s.start()}
+const ANN=[];let annBusy=false;
+function announce(name){if(PRESIM||!clean(name))return;if(ANN.length>=40)ANN.shift();ANN.push({t:name,at:performance.now()/1000});if(!annBusy)annNext()}
+function say(text){if(ANN.length<40)ANN.push({t:text,at:performance.now()/1000,line:true});if(!annBusy)annNext()}
+async function annNext(){while(ANN.length&&performance.now()/1000-ANN[0].at>120)ANN.shift();const a=ANN.shift();if(!a){annBusy=false;return}annBusy=true;const c=SND.ctx;
+  if(!c||c.state!=='running'){annBusy=false;ANN.length=0;return}
+  const buf=await Promise.race([fetch('/say?v=niwat&t='+encodeURIComponent(a.t),{cache:'no-cache'}).then(r=>r.ok?r.arrayBuffer():null).then(b=>b?c.decodeAudioData(b):null).catch(()=>null),new Promise(r=>setTimeout(()=>r(null),6000))]);
+  if(buf)await new Promise(res=>{const s=c.createBufferSource();s.buffer=buf;if(ANN.length>=3)s.playbackRate.value=1.12;const g=c.createGain();g.gain.value=a.line?0.75:0.6;s.connect(g).connect(SND.master);s.onended=res;s.start()});
+  setTimeout(annNext,ANN.length>=3?150:500)}
+sndInit();
+
+// ---------- จอ 2 มิติทับด้านบน: ป้าย ชื่อ คำอธิษฐาน ----------
+const ui=document.getElementById('ui'),g=ui.getContext('2d');
+function txt(s,x,y,size,col='#fff',align='left',w=700,stroke='rgba(10,8,30,.9)'){g.font=`${w} ${size}px ${FONT}`;g.textAlign=align;g.lineJoin='round';g.lineWidth=Math.max(5,size/4.5);g.strokeStyle=stroke;g.strokeText(s,x,y);g.fillStyle=col;g.fillText(s,x,y)}
+function panel(x,y,w,h,bc='#fff',a=0.6){g.beginPath();g.roundRect(x,y,w,h,22);g.fillStyle=`rgba(18,16,48,${a})`;g.fill();g.globalAlpha=0.7;g.strokeStyle=bc;g.lineWidth=2.5;g.beginPath();g.roundRect(x+2,y+2,w-4,h-4,20);g.stroke();g.globalAlpha=1}
+function heart(x,y,s,col='#ff6a8a'){g.fillStyle=col;g.beginPath();g.moveTo(x,y+s*0.35);g.bezierCurveTo(x-s*0.9,y-s*0.25,x-s*0.35,y-s*0.85,x,y-s*0.35);g.bezierCurveTo(x+s*0.35,y-s*0.85,x+s*0.9,y-s*0.25,x,y+s*0.35);g.fill()}
+function drawImg(im,x,y,s){if(im&&im.complete&&im.naturalWidth){g.drawImage(im,x-s/2,y-s/2,s,s);return true}return false}
+function avatar(p,x,y,r,ring){if(!p)return;g.save();g.beginPath();g.arc(x,y,r+3,0,7);g.fillStyle=ring;g.fill();g.beginPath();g.arc(x,y,r,0,7);g.clip();
+  if(p.pic&&p.pic.complete&&p.pic.naturalWidth)g.drawImage(p.pic,x-r,y-r,r*2,r*2);else{g.fillStyle=p.shirt||'#6a5a8a';g.fillRect(x-r,y-r,r*2,r*2);g.font=`700 ${r}px ${FONT}`;g.textAlign='center';g.fillStyle='#fff';g.fillText((p.name||'?').slice(0,1).toUpperCase(),x,y+r*0.36)}g.restore()}
+const V=new THREE.Vector3();
+function screenOf(L){V.setFromMatrixPosition(L.g.matrixWorld);V.y+=2.3*L.sc;V.project(camera);return {x:(V.x*0.5+0.5)*W,y:(-V.y*0.5+0.5)*H,ok:V.z<1}}
+function bubble(text,x,y){const t=text.length>22?text.slice(0,21)+'…':text;g.font=`600 26px ${FONT}`;const w=Math.max(80,g.measureText(t).width+30),h=44,bx=clamp(x-w/2,12,W-12-w);
+  g.fillStyle='rgba(255,250,235,.95)';g.beginPath();g.roundRect(bx,y-h,w,h,16);g.fill();g.beginPath();g.moveTo(x-9,y-1);g.lineTo(x+9,y-1);g.lineTo(x,y+12);g.fill();g.fillStyle='#3a2a50';g.textAlign='center';g.fillText(t,bx+w/2,y-13)}
+function drawLabels(){const list=lanterns.filter(L=>L.p&&L.fade>0.3).map(L=>({L,s:screenOf(L),age:NOW-Math.max(L.born,L.bubbleT||0)})).filter(o=>o.s.ok&&o.s.y>SAFE_T+300&&o.s.y<SAFE_B+200);
+  list.sort((a,b)=>b.age-a.age);
+  for(const {L,s,age} of list){const big=age<7,a=clamp(big?1:1-(age-7)/14,0,1);if(a<=0)continue;g.globalAlpha=a;
+    if(big){avatar(L.p,s.x,s.y-30,26,'#ffd08a');txt(short(L.p.name,10),s.x,s.y+12,24,'#ffe9c0','center',700);if(L.wish)bubble(L.wish,s.x,s.y-66)}
+    else{avatar(L.p,s.x,s.y-14,13,'#ffd08a');if(age<16)txt(short(L.p.name,8),s.x,s.y+12,18,'#ffe9c0','center',600)}
+    g.globalAlpha=1}}
+function hud(){
+  panel(16,SAFE_T,1048,196,'#ffd08a',0.62);
+  txt('โคมขอพร',540,SAFE_T+46,30,'#ffd08a','center',700);
+  txt('พิมพ์คำอธิษฐาน = ปล่อยโคมของคุณ',540,SAFE_T+100,42,'#ffffff','center',700);
+  heart(250,SAFE_T+138,30);txt('กดหัวใจ = โคมสว่าง ลอยสูงขึ้น',540,SAFE_T+150,32,'#ffc0d0','center',700);
+  g.font=`600 20px ${FONT}`;const items=TIERS.map(t=>[GIMG[t.id],t.n]);
+  items.forEach(([im,n],i)=>{const x=110+i*250;drawImg(im,x,SAFE_T+178,30);txt(n,x+22,SAFE_T+186,20,'#ffe2a8','left',600)});
+  const y=SAFE_T+206,g0=msIdx?MS_G(msIdx-1):0,g1=MS_G(msIdx),k=clamp((liveHearts-g0)/(g1-g0),0,1);
+  panel(16,y,1048,52,'#ff8aa8',0.55);heart(48,y+27,26);txt(`หัวใจทั้งไลฟ์ ${liveHearts.toLocaleString()} / ${g1.toLocaleString()}  ครบแล้วจุดพลุ`,76,y+24,20,'#fff','left',600);
+  txt(`ปล่อยโคมแล้ว ${wishesTotal.toLocaleString()} ดวง`,1044,y+24,20,'#ffd08a','right',600);
+  g.fillStyle='rgba(0,0,0,.4)';g.fillRect(76,y+33,968,10);const gr=g.createLinearGradient(76,0,1044,0);gr.addColorStop(0,'#ff6a8a');gr.addColorStop(1,'#ffd08a');g.fillStyle=gr;g.fillRect(76,y+33,968*k,10);
+  if(!DEMO&&live.state!=='live')txt({connecting:'กำลังต่อไลฟ์...',offline:'รอไลฟ์เริ่ม...',error:'ต่อไลฟ์ไม่ได้',server:'ไม่เจอ server.js'}[live.state]||'',540,y+86,22,'#ffd08a','center',500)}
+function drawOverlay(){g.clearRect(0,0,W,H);
+  drawLabels();
+  sparks=sparks.filter(sp=>NOW-sp.t<1);for(const sp of sparks){const k=NOW-sp.t;if(k<0)continue;const s=screenOf(sp.L);g.globalAlpha=1-k;heart(s.x+sp.dx,s.y-40-k*90,18+k*10,'#ff7a9a');g.globalAlpha=1}
+  pops=pops.filter(p=>NOW-p.t<1.6);for(const p of pops){const k=(NOW-p.t)/1.6,s=screenOf(p.L);g.globalAlpha=1-k*k;if(p.img)drawImg(p.img,s.x,s.y-120-k*60,70);txt(p.s,s.x,s.y-70-k*60,26,'#ffe08a','center');g.globalAlpha=1}
+  hud();
+  const bn=banners.find(b=>NOW>=b.t&&NOW<b.t+2.4);banners=banners.filter(b=>NOW<b.t+2.4);
+  if(bn){const k=ease.back(Math.min(1,(NOW-bn.t)/0.3));g.save();g.translate(540,700);g.scale(k,k);g.translate(-540,-700);panel(90,630,900,bn.sub?150:100,bn.col,0.8);txt(bn.s,540,696,46,bn.col,'center');if(bn.sub)txt(bn.sub,540,750,30,'#fff','center',600);g.restore()}
+  const cd=cards.find(c=>NOW>=c.t&&NOW<c.t+3);cards=cards.filter(c=>NOW<c.t+3);
+  if(cd){const k=ease.back(Math.min(1,(NOW-cd.t)/0.35)),a=Math.min(1,(cd.t+3-NOW)*3);g.globalAlpha=a;g.save();g.translate(540,1060);g.scale(k,k);g.translate(-540,-1060);
+    panel(90,980,900,170,'#ffd08a',0.85);avatar(cd.p,200,1065,56,'#ffd08a');txt('ขอบคุณ',282,1036,28,'#ffe9c0','left',500);txt(short(cd.p.name,12),282,1096,52,'#ffd08a','left',700);txt(cd.title,282,1136,26,'#fff','left',600);drawImg(cd.icon,900,1060,96);
+    g.restore();g.globalAlpha=1}
+  if(!lanterns.some(L=>L.p&&!L.p.sample&&NOW-L.born<20)&&!bn){const k=0.8+0.2*Math.sin(NOW*3);g.globalAlpha=k;panel(150,1190,780,140,'#ffd08a',0.7);txt('พิมพ์คำอธิษฐานมาเลย',540,1252,46,'#ffd08a','center');txt('แล้วดูโคมของคุณลอยขึ้นฟ้า',540,1302,30,'#fff','center',600);g.globalAlpha=1}
+  if(SND.ctx&&SND.ctx.state!=='running'){g.fillStyle='rgba(14,16,20,.8)';g.beginPath();g.roundRect(290,1846,500,52,26);g.fill();txt('คลิกจอ 1 ครั้ง เพื่อเปิดเสียง',540,1882,28,'#ffd08a','center',600)}
+  if(SHOWSAFE){g.fillStyle='rgba(255,0,0,.25)';g.fillRect(0,0,W,SAFE_T);g.fillRect(0,SAFE_B,W,H-SAFE_B)}}
+
+// ---------- ตอนไม่มีใครเล่น: โคมตัวอย่างลอยให้ฟ้าไม่ว่าง และชวนให้พิมพ์ ----------
+const SAMPLE_P={name:'ตัวอย่าง',sample:true,shirt:'#6a5a8a',hearts:0};let sampleT=2,ctaT=40;
+function attract(dt){const busy=Object.values(P).some(p=>NOW-p.last<30);
+  sampleT-=dt;if(sampleT<=0){sampleT=busy?rnd(12,20):rnd(4,7);makeLantern(busy?null:SAMPLE_P,busy?null:pick(SAMPLE),'sample')}
+  ctaT-=dt;if(ctaT<=0){ctaT=45;if(NOW-lastChat>20)say('พิมพ์คำอธิษฐานมาเลย แล้วดูโคมของคุณลอยขึ้นฟ้า')}}
+
+// ---------- คนดูจำลอง / โหมดทดสอบ ----------
+const FAKE=['ploy_99','mek.k','nongbeam','jaa_jaa','tonkla','minnie.th','pond2002','fern.f'];let simT={c:1,l:0,g:9};
+function sim(){const act=Object.values(P).filter(p=>!p.sample&&NOW-p.last<IDLE);
+  if(NOW>simT.c){simT.c=NOW+rnd(2,5);comment(pick(FAKE),pick(SAMPLE))}
+  if(NOW>simT.l){simT.l=NOW+0.5;if(act.length&&Math.random()<0.7)like(pick(act).name,rnd(1,6)|0)}
+  if(NOW>simT.g){simT.g=NOW+rnd(10,18);if(act.length)gift(pick(act).name,pick([1,1,5,30,30,100,299]))}}
+let crowdOn=Q.has('demo');
+if(Q.has('test')){const me='ผู้ทดสอบ',bar=document.createElement('div');
+  bar.style.cssText='position:fixed;left:0;right:0;bottom:0;background:rgba(14,16,20,.92);padding:8px;display:flex;flex-wrap:wrap;gap:6px;justify-content:center;font:600 15px Kanit,Tahoma;z-index:9';
+  const btn=(l,fn,bg='#3a3f48')=>{const b=document.createElement('button');b.textContent=l;b.style.cssText=`background:${bg};color:#fff;border:0;border-radius:8px;padding:8px 10px;font:inherit;cursor:pointer`;b.onclick=e=>{e.stopPropagation();SND.ctx&&SND.ctx.resume();fn()};bar.appendChild(b);return b};
+  btn('พิมพ์คำอธิษฐาน',()=>{const t=prompt('คำอธิษฐาน','ขอให้สอบผ่าน');if(t)comment(me,t)},'#4a7a3a');btn('♥ x5',()=>like(me,5),'#c0394b');btn('♥ x50',()=>like(me,50),'#c0394b');
+  btn('กุหลาบ 1',()=>gift(me,1,'5655'),'#8a5a2a');btn('โดนัท 30',()=>gift(me,30,'5879'),'#8a5a2a');btn('มือหัวใจ 100',()=>gift(me,100,'5660'),'#8a5a2a');btn('คอร์กี้ 299',()=>gift(me,299,'6267'),'#8a5a2a');
+  btn('กดติดตาม',()=>{followDone.delete(me);follow(me)},'#c0394b');const cb=btn('คนดูจำลอง: ปิด',()=>{crowdOn=!crowdOn;cb.textContent='คนดูจำลอง: '+(crowdOn?'เปิด':'ปิด')});document.body.appendChild(bar)}
+Object.assign(window,{comment,like,gift,follow,show,P,get lanterns(){return lanterns}});
+
+// ---------- ข้อมูลจริงจาก server.js ----------
+const ids={},used={};
+function nameFor(id,name){if(ids[id])return ids[id];let n=clean(name)?name:'ผู้ใช้',i=2;const base=n;while(used[n]&&used[n]!==id)n=`${base}${i++}`;used[n]=id;return ids[id]=n}
+function onLive(ev){if(ev.type==='status'){live={...live,...ev};return}if(ev.type==='control')return;const name=ev.id?nameFor(ev.id,ev.name):ev.name;
+  if(ev.type==='chat')comment(name,ev.text,ev.pic);else if(ev.type==='like')like(name,ev.count||1,ev.pic);else if(ev.type==='gift')gift(name,ev.coins||1,ev.giftId,ev.img,ev.pic);else if(ev.type==='follow')follow(name,ev.pic,ev.repeat)}
+if(!DEMO){let wsT=0;const open=()=>{const ws=new WebSocket(`ws://${location.host}/ws`);ws.onmessage=m=>{try{onLive(JSON.parse(m.data))}catch(e){console.error(e)}};ws.onclose=()=>{live.state='server';clearTimeout(wsT);wsT=setTimeout(open,2000)}};open()}
+
+// ---------- loop ----------
+let last=performance.now(),errN=0;
+function loop(t){requestAnimationFrame(loop);const dt=Math.min(0.05,(t-last)/1000);last=t;NOW+=dt;
+  try{if(crowdOn)sim();attract(dt);updLanterns(dt);updFireworks(dt);
+    flies.forEach(f=>{const u=f.userData;f.position.set(u.b.x+Math.sin(NOW*0.5+u.p)*1.5,u.b.y+Math.sin(NOW*0.8+u.p*2)*0.6,u.b.z+Math.cos(NOW*0.4+u.p)*1.5);f.material.opacity=0.4+0.4*Math.sin(NOW*3+u.p)});
+    camera.position.x=Math.sin(NOW*0.07)*1.2;camera.position.y=5+Math.sin(NOW*0.11)*0.4;camera.lookAt(LOOK);
+    composer.render();drawOverlay()}catch(e){if(errN++<5)console.error(e)}}
+document.fonts.load('700 40px Kanit').finally(()=>requestAnimationFrame(loop));
+</script></body></html>
