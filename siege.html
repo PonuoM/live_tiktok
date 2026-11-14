@@ -201,16 +201,31 @@ function myZombie(name){return zs.find(z=>z.owner===name&&z.hp>0)}
 const ease={out:k=>1-(1-k)*(1-k),back:k=>{const c=1.7;k-=1;return 1+k*k*((c+1)*k+c)},in:k=>k*k*k};
 
 // ---------- เลเวลจากหัวใจสะสม (เก็บข้ามรอบ) ----------
-const LV=[0,30,100,250,500];
+const LV=[0,30,100,250,500,1000,2000,3500,5000,8000];
 function lvOf(h){let l=1;LV.forEach((v,i)=>{if(h>=v)l=i+1});return l}
-const HELM=['#5b6b45','#5b6b45','#4f5a66','#3b4a5e','#b8902a'];
+const HELM=['#5b6b45','#5b6b45','#4f5a66','#3b4a5e','#b8902a','#9a3a2a','#8ab8d8','#2a2a32','#e8e0c0','#f0c86a'];
 function hScale(p){return 1.25}
+// สีออร่าแต่ละเลเวล: 2 ฟ้า 3 เขียว 4 ม่วง 5 ทอง 6 เพลิง 7 น้ำแข็ง 8 เงาดำขอบรุ้ง 9 ปีกแสง 10 ปีกรุ้ง
+const AURA_NAME=['','ออร่าฟ้า','ออร่าเขียว','ออร่าม่วง','ออร่าทอง','ออร่าเพลิง','ออร่าน้ำแข็ง','ออร่าเงารุ้ง','ปีกแสง','ปีกรุ้ง ระดับสูงสุด'];
+function auraCol(lv,al,o=0){if(lv>=8){const h=(NOW*90+o)%360;return lv===8?`hsla(${h},90%,62%,${al})`:lv===9?`hsla(${45+20*Math.sin(NOW*2+o)},100%,78%,${al})`:`hsla(${h},100%,66%,${al})`}
+  return `rgba(${[null,'120,180,255','120,230,140','200,120,255','255,205,90','255,100,50','170,235,255'][lv-1]},${al})`}
+function drawAura(d,lv,a){const cy=SY(d)-10,pul=0.5+0.5*Math.sin(NOW*4+d.slot),k=Math.min(lv,7);
+  if(lv===8){g.save();g.globalAlpha=0.55*a;g.fillStyle='#0a0810';g.beginPath();g.ellipse(d.x,cy,64,86,0,0,7);g.fill();g.restore()}
+  // ปีก (เลเวล 9-10)
+  if(lv>=9){g.save();g.globalCompositeOperation='lighter';const fl=Math.sin(NOW*5+d.slot)*0.18;
+    [-1,1].forEach(sd=>{g.save();g.translate(d.x+sd*14,cy-26);g.rotate(sd*(0.35+fl));for(let i=0;i<4;i++){g.fillStyle=auraCol(lv,0.5*a,i*40);g.beginPath();g.ellipse(sd*(30+i*14),-6+i*12,40-i*5,12,sd*(0.5+i*0.25),0,7);g.fill()}g.restore()});g.restore()}
+  glow(d.x,cy,56+k*14+pul*10,auraCol(lv,1),Math.min(1,0.35+lv*0.1)*a);
+  if(lv>=4){g.save();g.globalCompositeOperation='lighter';const ph=lv>=6?220:150,pg=g.createLinearGradient(0,cy-ph,0,cy+40);pg.addColorStop(0,auraCol(lv,0));pg.addColorStop(1,auraCol(lv,Math.min(0.6,0.25+lv*0.03)*a*(0.7+0.3*pul)));g.fillStyle=pg;g.fillRect(d.x-34,cy-ph,68,ph+40);g.restore()}
+  g.globalAlpha=0.85*a;g.strokeStyle=auraCol(lv,1);g.lineWidth=Math.min(10,4+lv);g.beginPath();g.ellipse(d.x,SY(d)+30,Math.min(56,30+lv*4),Math.min(18,9+lv),0,0,7);g.stroke();
+  if(lv>=10){g.strokeStyle=auraCol(10,1,180);g.lineWidth=4;g.beginPath();g.ellipse(d.x,SY(d)-88,26,8,0,0,7);g.stroke()}
+  g.globalAlpha=1;
+  if(lv>=3&&Math.random()<Math.min(0.3,0.08*(lv-2)))fx.push({type:'aura',x:d.x+pick([-1,1])*rnd(24,44),y:SY(d)+20,c:lv===6?pick(['#ff7a2c','#ffd04a','#e8402c']):lv===7?'#e8faff':auraCol(lv,1,rnd(0,360)),t:NOW,life:lv===6?0.6:0.9})}
 function boostOf(p,n){if(!p.boostT||NOW-p.boostT>2.5)p.combo=0;p.combo=(p.combo||0)+n;p.boostT=NOW}
 function setLook(p){p.set=humanSet(p.shirt,HELM[p.lv-1]);const d=defOf(p.name);if(d)d.set=p.set}
 function addHearts(p,n){p.hearts+=n;const l=lvOf(p.hearts);if(l>p.lv){p.lv=l;setLook(p);
   const d=defOf(p.name),z=myZombie(p.name),x=d?d.x:z?z.x:540,y=d?SY(d)-40:z?z.y-60:900;
   fx.push({type:'ring',x,y,r0:10,r1:140,c:'#f0c86a',t:NOW,life:0.6});for(let i=0;i<16;i++)fx.push({type:'spark',x,y,vx:rnd(-300,300),vy:rnd(-420,-80),c:'#f0c86a',t:NOW,life:0.8});
-  popup(`เลเวล ${l}!`,x,y-150,'#f0c86a',40);sfx('levelup');
+  popup(`เลเวล ${l}!`,x,y-150,'#f0c86a',40);sfx('levelup');if(l>=6&&!PRESIM){banner(`${short(p.name,12)} เลเวล ${l}!`,'#ffd04a',AURA_NAME[l-1]);sfx('honor')}
   if(z&&z.kind==='player'){const k=zStats(p);z.max=k.hp;z.hp=Math.max(z.hp,k.hp*0.8);z.s=k.s;z.dps=k.dps}}}
 // ซอมบี้ของคนดู: เลเวลไม่หายตอนตาย เกิดใหม่พร้อมหมวกตามเลเวล เลือดหนาขึ้น เรียกลูกสมุนได้มากขึ้น
 function zStats(p){const l=p.lv;return {hp:10+7*(l-1),s:1.25+0.08*(l-1),dps:8+3*(l-1)}}
@@ -386,6 +401,8 @@ function runEv(k){if(round.state!=='play')return;
 fetch('/record/siege').then(r=>r.json()).then(d=>{best=d.best||0}).catch(()=>{});
 function saveBest(){if(DEMO||live.state!=='live')return;fetch('/record/siege',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({best})}).catch(()=>{})}
 
+// แรงยิงตามเลเวล: 1, 1.5, 2, 2.5, 3 แล้วเพิ่มทีละ 0.3 จนเลเวล 10 = 4.5 เท่า
+function lvDmg(lv){return lv<=5?1+0.5*(lv-1):3+0.3*(lv-5)}
 // ---------- combat ----------
 function frontZ(){let best=null;for(const z of zs)if(z.hp>0&&(!best||z.y>best.y))best=z;return best}
 function hurt(z,dmg,p){if(z.hp<=0||z.under&&dmg<500)return;if(frenzy>NOW&&dmg<500)dmg*=0.5;if(z.sh>0&&dmg<500){z.sh-=dmg;z.hit=NOW;if(z.sh<=0){z.sh=0;popup('โล่แตก!',z.x,z.y-90,'#c9d1d9',26);for(let i=0;i<8;i++)fx.push({type:'bit',x:z.x,y:z.y-40,vx:rnd(-200,200),vy:rnd(-260,-60),c:'#8a6a44',t:NOW,life:0.6})}return}z.hp-=dmg;z.hit=NOW;
@@ -407,7 +424,7 @@ function shoot(d,dt){
   // ยิงได้แค่ครึ่งล่างของทุ่ง (หมอกควันทำให้สั้นลงอีก) แต่บอสยิงได้ทุกระยะ
   const rg=d.turret?rangeT():rangeH(),live=zs.filter(z=>z.hp>0&&!z.under&&(z.y>rg||z.kind==='boss'&&fog<=NOW&&z.y>SPAWN_Y+30));if(!live.length){d.cd=0.2;return}
   live.sort((a,b)=>b.y-a.y);const boss=live.find(z=>z.kind==='boss');const t=boss&&Math.random()<0.6?boss:pick(live.slice(0,3));
-  const lv=d.p?d.p.lv:1,mg=d.mg>NOW,dmg=(mg?2:1)*(d.turret?1:1+BAL.lvH*(lv-1))*(d.turret?1:buff('h'));
+  const lv=d.p?d.p.lv:1,mg=d.mg>NOW,dmg=(mg?2:1)*(d.turret?1:lvDmg(lv))*(d.turret?1:buff('h'));
   if(d.q>0||mg){d.q=Math.max(0,d.q-1);d.cd=mg?0.08:0.14}else d.cd=d.turret?1.3:Math.max(0.55,1.0-0.1*(lv-1));
   const sx=d.turret?d.x:d.x,sy=d.turret?WALL_TOP-26:SY(d)-64;d.aim=Math.atan2(t.y-40*t.s-sy,t.x-sx);d.fire=NOW;d.recoil=NOW;
   sfx(mg?'mg':'gun',d.turret?0.6:1);
@@ -538,10 +555,7 @@ function render(){
     if(d.downUntil>NOW){g.save();g.translate(d.x,SY(d)+20);g.rotate(1.3);g.translate(-d.x,-(SY(d)+20));drawSpr(d.set,d.x,SY(d)+30,sc,0,0.55*a);g.restore();
       txt(`${Math.ceil(d.downUntil-NOW)}`,d.x,SY(d)-20,40,'#b5e04f','center');return}
     // ออร่าตามความแข็งแกร่ง (เลเวลจากหัวใจสะสม) ตัวไม่ใหญ่ขึ้น
-    if(lv>=2){const AU=[null,"120,180,255","120,230,140","200,120,255","255,205,90"][lv-1],cy=SY(d)-10,pul=0.5+0.5*Math.sin(NOW*4+d.slot);
-      glow(d.x,cy,56+lv*14+pul*10,`rgba(${AU},1)`,(0.35+lv*0.12)*a);if(lv>=4){g.save();g.globalCompositeOperation="lighter";const pg=g.createLinearGradient(0,cy-150,0,cy+40);pg.addColorStop(0,`rgba(${AU},0)`);pg.addColorStop(1,`rgba(${AU},${0.35*a*(0.7+0.3*pul)})`);g.fillStyle=pg;g.fillRect(d.x-26-lv*2,cy-150,52+lv*4,190);g.restore()}
-      g.globalAlpha=0.85*a;g.strokeStyle=`rgba(${AU},1)`;g.lineWidth=4+lv;g.beginPath();g.ellipse(d.x,SY(d)+30,30+lv*4,9+lv,0,0,7);g.stroke();g.globalAlpha=1;
-      if(lv>=3&&Math.random()<0.25*(lv-2))fx.push({type:"aura",x:d.x+rnd(-24,24),y:SY(d)+20,c:`rgb(${AU})`,t:NOW,life:0.9})}
+    if(lv>=2)drawAura(d,lv,a);
     drawSpr(d.set,d.x,SY(d)+30+rk,sc,0,a);
     if(d.p){const hy=SY(d)+30+rk-18*PX*sc+3*PX*sc,hr=4.4*PX*sc;avatar(d.p,d.x,hy,hr,COL.h,2,true);
       if(d.reloadUntil>NOW)reloadIcon(d.x+hr+14,hy-hr+6,(NOW-d.reloadStart)/(d.reloadUntil-d.reloadStart))}
