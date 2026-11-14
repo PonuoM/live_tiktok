@@ -33,7 +33,12 @@ input{font:600 16px Kanit;width:80px;padding:10px;border-radius:10px;border:1px 
 <section><h2>สถานะตอนนี้</h2><div class="stat" id="stat"><div><b>-</b><span>ยังไม่เจอหน้าเกม</span></div></div>
 <p class="note" id="note"></p></section>
 
-<section><h2>เริ่ม / หยุด</h2>
+<section><h2>โคมขอพร (ใช้ได้ตอนเกมไลฟ์คือโคมขอพร)</h2>
+<div class="row">ชาวงานปล่อยโคม: <button data-c="npc" data-a="0">ปิด</button><button data-c="npc" data-a="1">ปกติ</button><button data-c="npc" data-a="2">คึกคัก</button><button class="pur" data-c="fireworks">จุดพลุ</button></div>
+<div class="row" style="margin-top:10px"><input id="mctext" style="width:min(100%,460px)" maxlength="140" placeholder="พิมพ์ให้โฆษกพูด เช่น ขอบคุณทุกคนที่มานะครับ"><button id="mcgo" class="blue">ให้โฆษกพูด</button></div>
+<p class="note">ชาวงานคือตัวละครในฉากที่ปล่อยโคมเอง ติดป้ายเป็นตัวละคร ไม่ใช่ชื่อคนดู และจะปล่อยห่างลงเองตอนมีคนดูเล่นอยู่</p></section>
+
+<section><h2>เริ่ม / หยุด (เกมป้อมสุดท้าย)</h2>
 <div class="row"><button class="go" data-c="start" data-a="1">เริ่มเกม (คลื่น 1)</button>
 <button data-c="pause">หยุดชั่วคราว</button><button data-c="resume">เล่นต่อ</button><button data-c="lobby">กลับไปจอรอเริ่ม</button></div>
 <div class="row" style="margin-top:10px">เริ่มที่คลื่น <input id="wave" type="number" min="1" value="1"><button id="goWave">ไป</button>
@@ -63,10 +68,14 @@ document.getElementById('bots').innerHTML=[0,2,4,6,8,10].map(n=>`<button data-c=
 function toast(t){const m=document.getElementById('msg');m.textContent=t;m.classList.add('show');setTimeout(()=>m.classList.remove('show'),1600)}
 async function send(cmd,arg){const r=await fetch('/control',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({cmd,arg})}).catch(()=>null);toast(r&&r.ok?'ส่งคำสั่งแล้ว':'ส่งไม่ได้ ตรวจว่า server.js ยังเปิดอยู่');setTimeout(poll,300)}
 document.addEventListener('click',e=>{const b=e.target.closest('button[data-c]');if(!b)return;let a=b.dataset.a;if(b.dataset.c==='autoev')a=a==='1';send(b.dataset.c,a)});
+document.getElementById('mcgo').onclick=()=>{const v=document.getElementById('mctext').value.trim();if(v)send('say',v)};
 document.getElementById('goWave').onclick=()=>send('start',Math.max(1,+document.getElementById('wave').value||1));
 async function poll(){const d=await fetch('/state').then(r=>r.json()).catch(()=>null),el=document.getElementById('stat'),note=document.getElementById('note');
   if(!d||!d.state){el.innerHTML='<div><b class="off">ไม่เจอหน้าเกม</b><span>เปิดลิงก์ / ใน LIVE Studio หรือเบราว์เซอร์ก่อน</span></div>';note.textContent=d?`ไลฟ์: ${d.live.state}`:'ติดต่อ server.js ไม่ได้';return}
-  const s=d.state;el.innerHTML=[[STATE[s.state]||s.state,'สถานะ'],[s.wave,'คลื่น'],[s.state==='play'?s.left+' วิ':'-','เหลือ'],[s.wall,'กำแพง'],[s.players,'คนเล่นจริง'],[s.bots||0,'บอท'],[s.zombies,'ซอมบี้'],[WX[s.weather]||s.weather,'อากาศ'],[s.best||'-','สถิติคลื่น']].map(([v,k])=>`<div><b>${v}</b><span>${k}</span></div>`).join('');
+  const s=d.state;
+  if(s.game==='lantern'){el.innerHTML=[['โคมขอพร','เกม'],[s.players,'คนเล่นใน 1 นาที'],[s.watching,'คนที่ต้อนรับแล้ว'],[s.lanterns,'โคมบนฟ้า'],[s.hearts,'หัวใจรวม'],[s.wishes,'โคมที่คนปล่อย'],[['ปิด','ปกติ','คึกคัก'][s.npc],'ชาวงานปล่อยโคม'],[s.fps+(s.quality?' ลดภาพ':''),'เฟรม/วิ']].map(([v,k])=>`<div><b>${v}</b><span>${k}</span></div>`).join('');
+    note.textContent=`ไลฟ์: ${({live:'ต่ออยู่',offline:'ยังไม่ได้ไลฟ์',connecting:'กำลังต่อ',error:'ต่อไม่ได้'})[s.live]||s.live}`;document.querySelectorAll('[data-c="npc"]').forEach(b=>b.classList.toggle('on',+b.dataset.a===s.npc));return}
+  el.innerHTML=[[STATE[s.state]||s.state,'สถานะ'],[s.wave,'คลื่น'],[s.state==='play'?s.left+' วิ':'-','เหลือ'],[s.wall,'กำแพง'],[s.players,'คนเล่นจริง'],[s.bots||0,'บอท'],[s.zombies,'ซอมบี้'],[WX[s.weather]||s.weather,'อากาศ'],[s.best||'-','สถิติคลื่น']].map(([v,k])=>`<div><b>${v}</b><span>${k}</span></div>`).join('');
   note.textContent=`ไลฟ์: ${({live:'ต่ออยู่',offline:'ยังไม่ได้ไลฟ์',connecting:'กำลังต่อ',error:'ต่อไม่ได้'})[s.live]||s.live}  |  เหตุการณ์อัตโนมัติ: ${s.autoEv?'เปิด':'ปิด'}  |  ล็อกอากาศ: ${s.wxLock?WX[s.wxLock]:'ไม่ล็อก'}`;
   document.querySelectorAll('[data-c="wxlock"]').forEach(b=>b.classList.toggle('on',(b.dataset.a||null)===(s.wxLock||null)));
   document.querySelectorAll('[data-c="bots"]').forEach(b=>b.classList.toggle('on',+b.dataset.a===(s.bots||0)));

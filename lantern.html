@@ -223,7 +223,7 @@ for(let i=0;i<15;i++){const r=Math.random(),a=addWalker(makePerson());
   if(r<0.3)addWalker(makePerson(),null,a,{x:rnd(-0.3,0.3),z:rnd(0.9,1.2)});
   else if(r<0.5)addWalker(makePerson({kid:true,item:Math.random()<0.6?'balloon':null}),null,a,{x:0.5,z:rnd(0.8,1.1)})}
 function turnTo(g,target,dt){let d=target-g.rotation.y;while(d>Math.PI)d-=6.2832;while(d<-Math.PI)d+=6.2832;g.rotation.y+=d*Math.min(1,dt*6)}
-function updWalkers(dt){for(let i=walkers.length-1;i>=0;i--){const w=walkers[i];if(w.p&&NOW-w.p.last>90){scene.remove(w.g);walkers.splice(i,1);w.p.walker=null}}
+function updWalkers(dt){for(let i=walkers.length-1;i>=0;i--){const w=walkers[i];if(w.p&&NOW-w.p.last>(w.p.wishes||w.p.hearts?90:35)){scene.remove(w.g);walkers.splice(i,1);w.p.walker=null}}
   for(const w of walkers){const g=w.g,L=w.lead;
     if(L){w.dir=L.dir;w.stop=L.stop;w.face=L.face;g.position.x+=(L.g.position.x-L.dir*0.25+w.off.x-g.position.x)*Math.min(1,dt*4);g.position.z=L.g.position.z+w.off.z}
     else if(w.stop>0)w.stop-=dt;
@@ -358,7 +358,7 @@ let lanterns=[];
 function dropLantern(L){scene.remove(L.g);L.mat.dispose();L.gl.material.dispose();L.flame.material.dispose()}
 function makeLantern(p,wish,kind='plain',opt={}){const K=KIND[kind],o=buildLantern(kind),g=o.g;
   const sc=2.3*K.s*(1+Math.min(0.5,(p&&p.hearts||0)/600));g.scale.setScalar(sc);
-  const wk=walkerOf(p),src=wk?wk.g.position:(opt.x!=null?null:pick(walkers).g.position);if(wk){wk.stop=3.2;wk.cheer=2.8;wk.face=0}
+  const wk=opt.from||walkerOf(p),src=wk?wk.g.position:(opt.x!=null?null:pick(walkers).g.position);if(wk){wk.stop=3.2;wk.cheer=2.8;wk.face=0}
   g.position.set(opt.x??clamp(src.x,-8,21),5.0,opt.z??src.z);g.rotation.y=rnd(0,6.28);scene.add(g);
   const L={...o,p,wish,kind,born:NOW,vy:rnd(2.0,2.8)*(kind==='giant'?0.8:1),vx:rnd(-0.55,0.45),ph:rnd(0,9),boost:0,boostT:-9,fade:1,ei:K.ei,sc};
   lanterns.push(L);if(lanterns.length>70)dropLantern(lanterns.shift());return L}
@@ -542,8 +542,8 @@ function drawLabels(){drawWalkerTags();const list=lanterns.filter(L=>L.p&&L.fade
   const newest=new Map();for(const o of list){const q=newest.get(o.L.p);if(!q||o.age<q.age)newest.set(o.L.p,o)}
   const show=list.filter(o=>newest.get(o.L.p)===o).sort((a,b)=>b.age-a.age),placed=[];
   for(const {L,s,age} of show){const big=age<7,a=clamp(big?1:1-(age-7)/14,0,1);if(a<=0)continue;g.globalAlpha=a;
-    if(big){avatar(L.p,s.x,s.y-30,26,'#ffd08a');txt(short(L.p.name,10),s.x,s.y+12,24,'#ffe9c0','center',700);if(L.wish){let by=s.y-66;for(let n=0;n<4&&placed.some(r=>Math.abs(r.x-s.x)<240&&Math.abs(r.y-by)<46);n++)by-=48;placed.push({x:s.x,y:by});if(by<s.y-70){g.strokeStyle='rgba(255,250,235,.6)';g.lineWidth=3;g.beginPath();g.moveTo(s.x,by+10);g.lineTo(s.x,s.y-58);g.stroke()}bubble(L.wish,s.x,by)}}
-    else{avatar(L.p,s.x,s.y-14,13,'#ffd08a');if(age<16)txt(short(L.p.name,8),s.x,s.y+12,18,'#ffe9c0','center',600)}
+    if(big){avatar(L.p,s.x,s.y-30,L.p.npc?20:26,L.p.npc?'#9fb6d6':'#ffd08a');txt(short(L.p.name,L.p.npc?16:10),s.x,s.y+12,L.p.npc?20:24,L.p.npc?'#cfe0f5':'#ffe9c0','center',700);if(L.wish){let by=s.y-66;for(let n=0;n<4&&placed.some(r=>Math.abs(r.x-s.x)<240&&Math.abs(r.y-by)<46);n++)by-=48;placed.push({x:s.x,y:by});if(by<s.y-70){g.strokeStyle='rgba(255,250,235,.6)';g.lineWidth=3;g.beginPath();g.moveTo(s.x,by+10);g.lineTo(s.x,s.y-58);g.stroke()}bubble(L.wish,s.x,by)}}
+    else{avatar(L.p,s.x,s.y-14,L.p.npc?10:13,L.p.npc?'#9fb6d6':'#ffd08a');if(age<16&&!L.p.npc)txt(short(L.p.name,8),s.x,s.y+12,18,'#ffe9c0','center',600)}
     g.globalAlpha=1}}
 function hud(){
   panel(16,SAFE_T,1048,196,'#ffd08a',0.62);
@@ -582,16 +582,30 @@ function drawOverlay(){g.clearRect(0,0,W,H);
   if(SHOWSAFE){g.fillStyle='rgba(255,0,0,.25)';g.fillRect(0,0,W,SAFE_T);g.fillRect(0,SAFE_B,W,H-SAFE_B)}}
 
 // ---------- ตอนไม่มีใครเล่น: โคมตัวอย่างลอยให้ฟ้าไม่ว่าง และชวนให้พิมพ์ ----------
-const SAMPLE_P={name:'ตัวอย่าง',sample:true,shirt:'#6a5a8a',hearts:0};let sampleT=2,ctaT=40;
-function attract(dt){const busy=Object.values(P).some(p=>NOW-p.last<30);
-  sampleT-=dt;if(sampleT<=0){sampleT=busy?rnd(12,20):rnd(4,7);makeLantern(busy?null:SAMPLE_P,busy?null:pick(SAMPLE),'sample')}
+// ---------- ชาวงานปล่อยโคม (บอท): ตัวละครในงานหยุดเดิน ยกแขน ปล่อยโคมเป็นระยะ ให้ฟ้าไม่ว่างตอนคนดูยังไม่เล่น ----------
+// ติดป้ายเป็นตัวละครในงาน (ลุงขายลูกชิ้น ป้าร้านชาไทย ...) สีป้ายต่างจากคนดูจริง ไม่ทำเป็นบัญชีคนดู ไม่ขึ้นป้ายแรงศรัทธา ไม่นับในยอดโคม โคมเล็กและหรี่กว่าของคนดู
+// ระดับ: 0 ปิด 1 ปกติ 2 คึกคัก ตั้งได้จาก ?npc= หรือหน้า /control ตอนมีคนดูเล่นอยู่จะปล่อยห่างลงเอง ให้โคมของคนจริงเด่น
+const NPC={level:Q.has('npc')?clamp(+Q.get('npc')|0,0,2):1,t:2,i:0,names:['ลุงขายลูกชิ้น','ป้าร้านชาไทย','น้องลูกโป่ง','คุณยายสายไหม','พี่ร้านน้ำแข็งใส','คุณตาเฝ้าชิงช้า','น้องปาโป่ง','แม่ค้าข้าวโพด','ลุงขายของเล่น','พี่วินหน้างาน']};
+const realActive=()=>Object.values(P).some(p=>(p.wishes||p.hearts)&&NOW-p.last<30);
+function npcRelease(){const c=walkers.filter(w=>!w.p&&!w.lead&&w.s>1.3&&w.g.position.x>-8&&w.g.position.x<23&&w.cheer<=0);if(!c.length)return;const w=pick(c);
+  if(!w.npc)w.npc={name:NPC.names[NPC.i++%NPC.names.length],sample:true,npc:true,shirt:'#5a7090',hearts:0,wishes:0};
+  makeLantern(w.npc,pick(SAMPLE),Math.random()<0.12?'flower':'sample',{from:w})}
+function attract(dt){if(NPC.level>0){NPC.t-=dt;if(NPC.t<=0){const busy=realActive();NPC.t=NPC.level===2?(busy?rnd(8,12):rnd(3,5)):(busy?rnd(16,26):rnd(5,8));npcRelease()}}
   mcIdle(dt)}
+// คนเพิ่งเข้าห้องแต่ยังไม่ทำอะไร: ได้ตัวเดินในงานพร้อมป้ายชื่อทันที โบกมือ และโฆษกเรียกชื่อ ถ้าไม่เล่นต่อ 35 วิ ตัวจะออกจากงานเอง (มีตัวรอแบบนี้ได้พร้อมกัน 12 ตัว)
+function joined(name,pic){if(PRESIM||!name||!clean(name))return;if(!P[name]&&Object.values(P).filter(p=>p.walker&&!p.wishes&&!p.hearts).length<12){const p=player(name,pic),w=walkerOf(p);if(w){w.stop=2.4;w.cheer=1.6;w.face=0}}
+  welcome(name)}
+// คำสั่งจากหน้า /control และรายงานสถานะกลับทุกวินาที
+function control(c){const a=c.arg;if(c.cmd==='npc')NPC.level=clamp(+a|0,0,2);else if(c.cmd==='fireworks')show(8,{heart:true});else if(c.cmd==='say'&&a&&clean(a))mcSay(String(a).slice(0,150),{pri:1,chime:1,ttl:60});else if(c.cmd==='reload')location.reload();sendState()}
+let wsRef=null;
+function sendState(){if(!wsRef||wsRef.readyState!==1)return;wsRef.send(JSON.stringify({type:'state',game:'lantern',state:'play',players:Object.values(P).filter(p=>(p.wishes||p.hearts)&&NOW-p.last<60).length,watching:greeted.size,lanterns:lanterns.length,hearts:liveHearts,wishes:wishesTotal,npc:NPC.level,fps:Math.round(fpsNow),quality,live:live.state}))}
+setInterval(sendState,1000);
 
 // ---------- คนดูจำลอง / โหมดทดสอบ ----------
 const FAKE=['ploy_99','mek.k','nongbeam','jaa_jaa','tonkla','minnie.th','pond2002','fern.f'],FAKE2=['somchai','น้องมายด์','beer_bkk','kwankwan','aomsin','พี่ต้น','nutty','น้องฟ้า','benz','ป้าแดง'];let simT={c:1,l:0,g:9,j:3};
 function sim(){const act=Object.values(P).filter(p=>!p.sample&&NOW-p.last<IDLE);
   if(NOW>simT.c){simT.c=NOW+rnd(2,5);comment(pick(FAKE),pick(SAMPLE))}
-  if(NOW>simT.j){simT.j=NOW+rnd(6,11);welcome(pick(FAKE2))}
+  if(NOW>simT.j){simT.j=NOW+rnd(6,11);joined(pick(FAKE2))}
   if(NOW>simT.l){simT.l=NOW+0.5;if(act.length&&Math.random()<0.7)like(pick(act).name,rnd(1,6)|0)}
   if(NOW>simT.g){simT.g=NOW+rnd(10,18);if(act.length)gift(pick(act).name,pick([1,1,5,30,30,100,299]))}}
 let crowdOn=Q.has('demo');
@@ -600,15 +614,15 @@ if(Q.has('test')){const me='ผู้ทดสอบ',bar=document.createElement
   const btn=(l,fn,bg='#3a3f48')=>{const b=document.createElement('button');b.textContent=l;b.style.cssText=`background:${bg};color:#fff;border:0;border-radius:8px;padding:8px 10px;font:inherit;cursor:pointer`;b.onclick=e=>{e.stopPropagation();SND.ctx&&SND.ctx.resume();fn()};bar.appendChild(b);return b};
   const inp=document.createElement('input');inp.value='ขอให้สอบผ่าน';inp.maxLength=34;inp.style.cssText='font:inherit;padding:7px 9px;border-radius:8px;border:0;width:190px';inp.onpointerdown=e=>e.stopPropagation();inp.onkeydown=e=>{e.stopPropagation();if(e.key==='Enter')comment(me,inp.value)};bar.appendChild(inp);btn('ปล่อยโคม',()=>comment(me,inp.value),'#4a7a3a');btn('♥ x5',()=>like(me,5),'#c0394b');btn('♥ x50',()=>like(me,50),'#c0394b');
   btn('กุหลาบ 1',()=>gift(me,1,'5655'),'#8a5a2a');btn('โดนัท 30',()=>gift(me,30,'5879'),'#8a5a2a');btn('มือหัวใจ 100',()=>gift(me,100,'5660'),'#8a5a2a');btn('คอร์กี้ 299',()=>gift(me,299,'6267'),'#8a5a2a');
-  btn('กดติดตาม',()=>{followDone.delete(me);follow(me)},'#c0394b');btn('พลุ',()=>show(8,{heart:true}),'#5a3a7a');btn('คนเข้าใหม่',()=>{const n=FAKE2.find(x=>!greeted.has(x))||pick(FAKE2)+' '+(greeted.size+1);welcome(n)},'#3a5a7a');const cb=btn('คนดูจำลอง: ปิด',()=>{crowdOn=!crowdOn;cb.textContent='คนดูจำลอง: '+(crowdOn?'เปิด':'ปิด')});document.body.appendChild(bar)}
-Object.assign(window,{comment,like,gift,follow,show,rocket,burst,welcome,P,_dev:{scene,renderer,composer,bloom,fwMat,THREE},dbg:()=>({mc:{said:MC.said||0,q:MC.q.length},honor:!!honor,top:RK.top.map(p=>p.name+' '+faith(p)).join(', '),music:MUS.next>0,audio:SND.ctx&&SND.ctx.state,lanterns:lanterns.length,walkers:walkers.length,fireworks:fireworks.length,quality,fps:Math.round(fpsNow),calls:renderer.info.render.calls,tris:renderer.info.render.triangles,sounds:Object.keys(SND.buf).sort().join(' ')})});
+  btn('กดติดตาม',()=>{followDone.delete(me);follow(me)},'#c0394b');btn('พลุ',()=>show(8,{heart:true}),'#5a3a7a');btn('คนเข้าห้อง (ยังไม่เล่น)',()=>{const n=FAKE2.find(x=>!greeted.has(x))||pick(FAKE2)+' '+(greeted.size+1);joined(n)},'#3a5a7a');const nb=btn('ชาวงานปล่อยโคม: '+['ปิด','ปกติ','คึกคัก'][NPC.level],()=>{NPC.level=(NPC.level+1)%3;NPC.t=1;nb.textContent='ชาวงานปล่อยโคม: '+['ปิด','ปกติ','คึกคัก'][NPC.level]},'#3a5a7a');const cb=btn('คนดูจำลอง: ปิด',()=>{crowdOn=!crowdOn;cb.textContent='คนดูจำลอง: '+(crowdOn?'เปิด':'ปิด')});document.body.appendChild(bar)}
+Object.assign(window,{comment,like,gift,follow,show,rocket,burst,welcome,joined,P,_dev:{scene,renderer,composer,bloom,fwMat,THREE},dbg:()=>({greeted:greeted.size,npc:NPC.level,npcLanterns:lanterns.filter(L=>L.p&&L.p.npc).length,idleWalkers:Object.values(P).filter(p=>p.walker&&!p.wishes&&!p.hearts).length,mc:{said:MC.said||0,q:MC.q.length},honor:!!honor,top:RK.top.map(p=>p.name+' '+faith(p)).join(', '),music:MUS.next>0,audio:SND.ctx&&SND.ctx.state,lanterns:lanterns.length,walkers:walkers.length,fireworks:fireworks.length,quality,fps:Math.round(fpsNow),calls:renderer.info.render.calls,tris:renderer.info.render.triangles,sounds:Object.keys(SND.buf).sort().join(' ')})});
 
 // ---------- ข้อมูลจริงจาก server.js ----------
 const ids={},used={};
 function nameFor(id,name){if(ids[id])return ids[id];let n=clean(name)?name:'ผู้ใช้',i=2;const base=n;while(used[n]&&used[n]!==id)n=`${base}${i++}`;used[n]=id;return ids[id]=n}
-function onLive(ev){if(ev.type==='status'){live={...live,...ev};return}if(ev.type==='control')return;const name=ev.id?nameFor(ev.id,ev.name):ev.name;
-  if(ev.type==='chat')comment(name,ev.text,ev.pic);else if(ev.type==='like')like(name,ev.count||1,ev.pic);else if(ev.type==='gift')gift(name,ev.coins||1,ev.giftId,ev.img,ev.pic);else if(ev.type==='follow')follow(name,ev.pic,ev.repeat);else if(ev.type==='join')welcome(name)}
-if(!DEMO){let wsT=0;const open=()=>{const ws=new WebSocket(`ws://${location.host}/ws`);ws.onmessage=m=>{try{onLive(JSON.parse(m.data))}catch(e){console.error(e)}};ws.onclose=()=>{live.state='server';clearTimeout(wsT);wsT=setTimeout(open,2000)}};open()}
+function onLive(ev){if(ev.type==='status'){live={...live,...ev};return}if(ev.type==='control'){control(ev);return}const name=ev.id?nameFor(ev.id,ev.name):ev.name;
+  if(ev.type==='chat')comment(name,ev.text,ev.pic);else if(ev.type==='like')like(name,ev.count||1,ev.pic);else if(ev.type==='gift')gift(name,ev.coins||1,ev.giftId,ev.img,ev.pic);else if(ev.type==='follow')follow(name,ev.pic,ev.repeat);else if(ev.type==='join')joined(name,ev.pic)}
+if(!DEMO){let wsT=0;const open=()=>{const ws=new WebSocket(`ws://${location.host}/ws`);wsRef=ws;ws.onmessage=m=>{try{onLive(JSON.parse(m.data))}catch(e){console.error(e)}};ws.onclose=()=>{live.state='server';clearTimeout(wsT);wsT=setTimeout(open,2000)}};open()}
 
 // ---------- loop ----------
 let last=performance.now(),errN=0;
