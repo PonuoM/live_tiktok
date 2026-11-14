@@ -30,6 +30,17 @@ const server = http.createServer(async (req, res) => {
   const GAMES = JSON.parse(fs.readFileSync(path.join(DIR, "games.json"), "utf8"));
   const ACTIVE_F = path.join(DIR, "active-game.json");
   const active = () => { try { const id = JSON.parse(fs.readFileSync(ACTIVE_F, "utf8")).id; if (GAMES.some(g => g.id === id)) return id; } catch {} return GAMES[0].id; };
+  // หน้าควบคุมเกมระหว่างไลฟ์: ส่งคำสั่งเข้าหน้าเกมผ่าน WebSocket
+  if (url.pathname === "/control" && req.method === "POST") {
+    let body = ""; for await (const ch of req) { body += ch; if (body.length > 300) break; }
+    const c = JSON.parse(body || "{}"), ok = /^[a-z]+$/.test(String(c.cmd || ""));
+    if (ok) { send({ type: "control", cmd: c.cmd, arg: c.arg ?? null }); console.log("คำสั่งควบคุม:", c.cmd, c.arg ?? ""); }
+    res.writeHead(ok ? 200 : 400, { "content-type": "application/json" }); return res.end(JSON.stringify({ ok }));
+  }
+  if (url.pathname === "/state") {
+    res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+    return res.end(JSON.stringify({ state: gameState && Date.now() - gameState.at < 5000 ? gameState : null, live: status }));
+  }
   if (url.pathname === "/games") { res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" }); return res.end(JSON.stringify({ games: GAMES, active: active() })); }
   if (url.pathname === "/active") {
     if (req.method === "POST") { let body = ""; for await (const ch of req) { body += ch; if (body.length > 200) break; }
@@ -54,7 +65,7 @@ const server = http.createServer(async (req, res) => {
   const isLive = url.pathname === "/" || url.pathname === "/index.html";
   const gid = isLive ? active() : alias || (pm && pm[1]);
   const game = GAMES.find(g => g.id === gid);
-  const page = url.pathname === "/lib" ? "library.html" : game && game.file;
+  const page = url.pathname === "/lib" ? "library.html" : url.pathname === "/control" ? "control.html" : game && game.file;
   if (page) {
     res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
     let html = fs.readFileSync(path.join(DIR, page), "utf8");
@@ -74,7 +85,12 @@ const server = http.createServer(async (req, res) => {
 const wss = new WebSocketServer({ server, path: '/ws' });
 let status = { type: 'status', state: DEMO ? 'demo' : 'connecting', user: USER, viewers: 0 };
 const send = ev => { const s = JSON.stringify(ev); wss.clients.forEach(c => c.readyState === 1 && c.send(s)); };
-wss.on('connection', ws => ws.send(JSON.stringify(status)));
+// หน้าเกมรายงานสถานะกลับมาทุกวินาที หน้าควบคุมอ่านจาก /state
+let gameState = null;
+wss.on('connection', ws => {
+  ws.send(JSON.stringify(status));
+  ws.on('message', m => { try { const d = JSON.parse(String(m)); if (d.type === 'state') gameState = { ...d, at: Date.now() }; } catch {} });
+});
 const setStatus = patch => { status = { ...status, ...patch }; send(status); };
 server.listen(PORT, '127.0.0.1', () => console.log(`หน้าเกม: http://127.0.0.1:${PORT}/${DEMO ? '?demo=1' : ''}`));
 

@@ -175,7 +175,7 @@ sndInit();
 
 // ---------- state ----------
 let P={},defs=[],zs=[],fx=[],pops=[],tracers=[],banners=[],pending=[];
-let round={n:1,t0:0,wall:MAXWALL,state:'play',endT:0,win:null},score={h:0,z:0},likesTotal=0,spawnAcc=0,shake=0;
+let round={n:1,t0:0,wall:MAXWALL,state:DEMO?'play':'lobby',endT:0,win:null},score={h:0,z:0},likesTotal=0,spawnAcc=0,shake=0;
 const turrets=[{x:58,cd:0,q:0,turret:true,name:'ป้อมบอท'},{x:1022,cd:0.6,q:0,turret:true,name:'ป้อมบอท'}];
 const followDone=new Set();
 // ชั้นรอยเลือดและรอยไหม้บนพื้น ค่อยๆ จางเอง ล้างทุกรอบ
@@ -276,8 +276,41 @@ function botKind(){const w=round.n,pool=[['bot',10]];
 function spawnBot(){const k=botKind();if(ZINFO[k]&&!seenZ.has(k)&&!PRESIM){seenZ.add(k);banner('ซอมบี้ใหม่: '+ZINFO[k].n,'#e09a4a',ZINFO[k].sub)}return spawnZ(k,null)}
 // ของขวัญฝั่งซอมบี้: หมอกควันลดระยะยิง ฝูงคลั่งเร็วและอึดทั้งทุ่ง ลูกพิษจากซอมบี้พ่นพิษและบอส
 let fog=0,frenzy=0,proj=[];
-function rangeH(){return fog>NOW?950:RANGE_H}
-function rangeT(){return fog>NOW?1000:RANGE_T}
+// ---------- พยากรณ์อากาศ: สุ่มใหม่ทุกคลื่น เฉพาะตอนมีคนเล่น 3 คนขึ้นไป (คนน้อยไม่มีใครกดแก้) ----------
+const WX={
+ clear:{n:'ฟ้าปกติ',sub:'',fire:1,reload:1,zsp:1,range:0},
+ sun:{n:'แดดจัด',sub:'ทหารเหนื่อย รีโหลดช้าลง',fire:1,reload:1.7,zsp:1,range:0},
+ rain:{n:'ฝนตก',sub:'มองเห็นสั้นลงนิดหน่อย ซอมบี้ลื่นเดินช้าลง',fire:1,reload:1,zsp:0.92,range:60},
+ storm:{n:'พายุ',sub:'มองเห็นยาก ระยะยิงสั้นลง',fire:1,reload:1,zsp:1,range:170},
+ snow:{n:'หิมะหนาว',sub:'ยิงช้าลง แต่ซอมบี้ก็เดินช้าลง',fire:1.45,reload:1,zsp:0.68,range:0},
+ dark:{n:'กลางคืนมืดสนิท',sub:'ยิงได้เฉพาะในแสงไฟ กดหัวใจจุดคบเพลิง!',fire:1,reload:1,zsp:1,range:0}};
+let wx='clear',torches=[],torchProg=0,wxLock=null;
+function WXc(){return WX[wx]}
+function torchNeed(){return 30+8*activeOf('h').length}
+function pickWeather(){torches=[];torchProg=0;if(wxLock)return wxLock;if(round.n<2||activeOf('h').length<3)return 'clear';
+  return pick(['clear','clear','sun','rain','storm','snow','dark','dark'])}
+// มืด: ไฟฉายสุ่ม 3 ดวงส่องไปมา + คบเพลิงที่คนดูจุด + แสงใกล้กำแพง ยิงได้เฉพาะซอมบี้ในแสง
+function lights(){const L=[0,1,2].map(i=>({x:540+Math.sin(NOW*0.45+i*2.1)*380,y:760+Math.cos(NOW*0.33+i*1.7)*200,r:140}));return L.concat(torches.map(t=>({x:t.x,y:t.y,r:200})))}
+function lit(z){if(wx!=='dark')return true;if(z.y>1010)return true;return lights().some(l=>Math.hypot(z.x-l.x,(z.y-l.y)*1.2)<l.r)}
+function addTorch(){const t={x:rnd(120,960),y:rnd(560,960),t:NOW};torches.push(t);if(torches.length>5)torches.shift();sfx('levelup');popup('จุดคบเพลิงแล้ว!',t.x,t.y-90,'#ffb04a',34);fx.push({type:'ring',x:t.x,y:t.y,r0:20,r1:220,c:'#ffb04a',t:NOW,life:0.6})}
+function rangeH(){return (fog>NOW?950:RANGE_H)+WXc().range}
+function rangeT(){return (fog>NOW?1000:RANGE_T)+WXc().range}
+function drawWeather(){const k=wx;
+  if(k==='sun'){g.save();g.globalCompositeOperation='lighter';const sg=g.createRadialGradient(900,380,0,900,380,900);sg.addColorStop(0,'rgba(255,220,140,.35)');sg.addColorStop(1,'rgba(255,200,120,0)');g.fillStyle=sg;g.fillRect(0,0,W,H);g.restore();
+    g.fillStyle='rgba(255,170,60,.10)';g.fillRect(0,0,W,H)}
+  if(k==='rain'||k==='storm'){const n=k==='storm'?160:90;g.strokeStyle=k==='storm'?'rgba(200,215,235,.55)':'rgba(190,205,225,.45)';g.lineWidth=2;g.beginPath();
+    for(let i=0;i<n;i++){const x=((i*97.3+NOW*(k==='storm'?520:300))%(W+200))-100,y=((i*151.7+NOW*1300)%H);g.moveTo(x,y);g.lineTo(x-(k==='storm'?26:10),y+34)}g.stroke();
+    g.fillStyle=k==='storm'?'rgba(20,28,40,.38)':'rgba(30,40,55,.18)';g.fillRect(0,0,W,H);
+    if(k==='storm'){const f=(NOW*0.37)%1;if(f<0.04||(f>0.08&&f<0.1)){g.fillStyle='rgba(235,240,255,.55)';g.fillRect(0,0,W,H)}}}
+  if(k==='snow'){g.fillStyle='rgba(225,235,245,.16)';g.fillRect(0,0,W,H);g.fillStyle='#f4f8ff';
+    for(let i=0;i<120;i++){const x=((i*83.1+Math.sin(NOW+i)*30+NOW*20)%W+W)%W,y=((i*137.9+NOW*(60+i%5*15))%H),s=2+i%3*1.5;g.fillRect(x,y,s,s)}}
+  if(k==='dark'){if(!drawWeather.c){drawWeather.c=document.createElement('canvas');drawWeather.c.width=W;drawWeather.c.height=H}const c=drawWeather.c,x=c.getContext('2d');
+    x.globalCompositeOperation='source-over';x.clearRect(0,0,W,H);x.fillStyle='rgba(4,6,14,.9)';x.fillRect(0,0,W,H);x.globalCompositeOperation='destination-out';
+    const hole=(cx,cy,r)=>{const gr=x.createRadialGradient(cx,cy,r*0.3,cx,cy,r);gr.addColorStop(0,'rgba(0,0,0,1)');gr.addColorStop(1,'rgba(0,0,0,0)');x.fillStyle=gr;x.beginPath();x.ellipse(cx,cy,r,r/1.2,0,0,7);x.fill()};
+    lights().forEach(l=>hole(l.x,l.y,l.r*1.15));const wg=x.createLinearGradient(0,980,0,1160);wg.addColorStop(0,'rgba(0,0,0,0)');wg.addColorStop(1,'rgba(0,0,0,.85)');x.fillStyle=wg;x.fillRect(0,980,W,H-980);
+    g.drawImage(c,0,0);
+    g.save();g.globalCompositeOperation='lighter';lights().slice(0,3).forEach((l,i)=>{const bx=200+i*340,gr=g.createLinearGradient(bx,WALL_TOP,l.x,l.y);gr.addColorStop(0,'rgba(255,240,200,.18)');gr.addColorStop(1,'rgba(255,240,200,.04)');g.fillStyle=gr;g.beginPath();g.moveTo(bx-8,WALL_TOP-20);g.lineTo(bx+8,WALL_TOP-20);g.lineTo(l.x+l.r*0.8,l.y);g.lineTo(l.x-l.r*0.8,l.y);g.fill()});g.restore();
+    torches.forEach(t=>{g.fillStyle='#4a3a2a';g.fillRect(t.x-5,t.y-10,10,46);const fl=8+Math.sin(NOW*14+t.x)*4;g.fillStyle='#ffb04a';g.beginPath();g.ellipse(t.x,t.y-18,9,fl+8,0,0,7);g.fill();glow(t.x,t.y-18,120,'rgba(255,170,80,1)',0.45)})}}
 function hpMax(p){return 10+4*((p&&p.lv||1)-1)}
 // บาลานซ์อัตโนมัติ: ฝั่งที่แพ้ติดกันได้บัฟรอบละ 25% (สูงสุด 75%) และเลือดซอมบี้เพิ่ม 15% ต่อคนฝั่งคนที่กำลังเล่น
 // ค่าสมดุลทั้งหมดอยู่ตรงนี้
@@ -349,7 +382,7 @@ const p=team(name,null,pic);boostOf(p,1);
   else{const z=myZombie(name);if(z){z.say=text;z.sayT=NOW}if(!t)spawnZ('mini',p)}
 }
 function like(name,n,pic){
-  const p=team(name,null,pic);likesTotal+=n;addHearts(p,n);boostOf(p,n);
+  const p=team(name,null,pic);likesTotal+=n;addHearts(p,n);boostOf(p,n);if(wx==='dark'&&round.state==='play'){torchProg+=n;while(torchProg>=torchNeed()){torchProg-=torchNeed();addTorch()}}
   if(p.team==='h'){const d=defOf(name)||pick(defs.filter(x=>!x.leave).concat(turrets));if(d)d.q=Math.min(BAL.qCap,d.q+n*BAL.likeH)}
   else{p.energy=(p.energy||0)+n;const per=1+Math.floor((p.lv-1)/2),k=Math.min(8,Math.floor(p.energy/BAL.likeZ));p.energy-=k*BAL.likeZ;for(let i=0;i<k*per;i++)spawnZ('mini',p)}
 }
@@ -386,10 +419,12 @@ function follow(name,pic,repeat){
     act:()=>{if(p.team==='h'){const t=frontZ();if(t)area(t.x,t.y,170,8,p)}else for(let i=0;i<3;i++)spawnZ('mini',p)}})}
 
 // ---------- เหตุการณ์สุ่มฝั่งซอมบี้ (แทนคนเล่นฝั่งซอมบี้) ----------
-let evT=20,evWarn=null,best=0;
+let evT=20,evWarn=null,best=0,evForce=false,autoEv=true,paused=false;
 const EVS={fog:{n:'หมอกควัน!',sub:'ระยะยิงหดลง',col:'#b9c4a8'},spit:{n:'ซอมบี้พ่นพิษ!',sub:'ยิงมันก่อนมันพ่นใส่ทหาร',col:'#b5dc78'},frenzy:{n:'ฝูงคลั่ง!',sub:'ซอมบี้เร็วและอึดขึ้น',col:'#e5566b'},boss:{n:'บอสมาแล้ว!',sub:'ช่วยกันกดหัวใจยิงบอส',col:'#c98aff'}};
 function evTick(dt){if(cine.cur)return;
   if(evWarn){if(NOW>=evWarn.t)runEv(evWarn.k),evWarn=null;return}
+  if(!autoEv)return;
+  if(activeOf('h').length<3&&!evForce)return;
   evT-=dt;if(evT>0||NOW-round.t0>ROUND-12)return;
   const pool=['fog','spit','spit','frenzy'];if(round.n>=3||NOW-round.t0>40)pool.push('boss');if(round.n>=5)pool.push('boss','spit');
   const k=pick(pool);evWarn={k,t:NOW+3};evT=Math.max(14,rnd(30,45)-round.n*1.5);sfx('zgroan');banner('ระวัง! '+EVS[k].n,EVS[k].col,EVS[k].sub)}
@@ -422,13 +457,13 @@ function shoot(d,dt){
   if(!d.turret){if(d.reloadUntil>NOW)return;if(d.reloadUntil){d.reloadUntil=0;d.mag=magSize(d)}if(d.mag==null)d.mag=magSize(d)}
   d.cd-=dt;if(d.cd>0)return;
   // ยิงได้แค่ครึ่งล่างของทุ่ง (หมอกควันทำให้สั้นลงอีก) แต่บอสยิงได้ทุกระยะ
-  const rg=d.turret?rangeT():rangeH(),live=zs.filter(z=>z.hp>0&&!z.under&&(z.y>rg||z.kind==='boss'&&fog<=NOW&&z.y>SPAWN_Y+30));if(!live.length){d.cd=0.2;return}
+  const rg=d.turret?rangeT():rangeH(),live=zs.filter(z=>z.hp>0&&!z.under&&lit(z)&&(z.y>rg||z.kind==='boss'&&fog<=NOW&&z.y>SPAWN_Y+30));if(!live.length){d.cd=0.2;return}
   live.sort((a,b)=>b.y-a.y);const boss=live.find(z=>z.kind==='boss');const t=boss&&Math.random()<0.6?boss:pick(live.slice(0,3));
   const lv=d.p?d.p.lv:1,mg=d.mg>NOW,dmg=(mg?2:1)*(d.turret?1:lvDmg(lv))*(d.turret?1:buff('h'));
-  if(d.q>0||mg){d.q=Math.max(0,d.q-1);d.cd=mg?0.08:0.14}else d.cd=d.turret?1.3:Math.max(0.55,1.0-0.1*(lv-1));
+  if(d.q>0||mg){d.q=Math.max(0,d.q-1);d.cd=(mg?0.08:0.14)*WXc().fire}else d.cd=(d.turret?1.3:Math.max(0.55,1.0-0.1*(Math.min(lv,5)-1)))*WXc().fire;
   const sx=d.turret?d.x:d.x,sy=d.turret?WALL_TOP-26:SY(d)-64;d.aim=Math.atan2(t.y-40*t.s-sy,t.x-sx);d.fire=NOW;d.recoil=NOW;
   sfx(mg?'mg':'gun',d.turret?0.6:1);
-  if(!d.turret){d.mag--;if(d.mag<=0){sfx('reload');d.reloadStart=NOW;d.reloadUntil=NOW+(mg?1.3:0.9);fx.push({type:'mag',x:d.x+10,y:SY(d)-40,vx:rnd(30,80),vy:-120,t:NOW,life:0.8})}}
+  if(!d.turret){d.mag--;if(d.mag<=0){sfx('reload');d.reloadStart=NOW;d.reloadUntil=NOW+(mg?1.3:0.9)*WXc().reload;fx.push({type:'mag',x:d.x+10,y:SY(d)-40,vx:rnd(30,80),vy:-120,t:NOW,life:0.8})}}
   const ty=t.y-40*t.s;d.bx=t.x;d.by=ty;if(!mg)tracers.push({x1:sx+Math.cos(d.aim)*52,y1:sy+Math.sin(d.aim)*52,x2:t.x+rnd(-8,8),y2:ty,t:NOW,c:mg?'#ffb05a':'#ffe9a0',w:mg||lv>=3?5:3});
   for(let i=0;i<3;i++)fx.push({type:'spark',x:t.x,y:ty,vx:rnd(-160,160),vy:rnd(-200,40),c:'#ffe9a0',t:NOW,life:0.25});
   if(!d.turret)fx.push({type:'shell',x:sx+8,y:sy+6,vx:rnd(60,140),vy:rnd(-220,-140),t:NOW,life:0.5});
@@ -462,7 +497,11 @@ function endRound(win){sfx(win==='h'?'win':'lose');round.state='end';round.endT=
   for(let i=0;i<140;i++)fx.push({type:'conf',x:rnd(0,W),y:rnd(-300,380),vx:rnd(-60,60),vy:rnd(160,320),rot:rnd(0,6),vr:rnd(-8,8),c:pick(cc),w:rnd(10,18),t:NOW,life:INTER})
 }
 function newRound(){evT=rnd(18,26);evWarn=null;round={n:round.next||round.n+1,t0:NOW,wall:MAXWALL,state:'play',endT:0,win:null};zs=[];pending=[];proj=[];fog=0;frenzy=0;defs.forEach(d=>{d.downUntil=0;d.hp=d.max});D.clearRect(0,0,W,H);
-  Object.values(P).forEach(p=>{p.kills=0;p.dmg=0;p.rz=0});banner(`คลื่นที่ ${round.n}`,'#fff',round.n>=best&&best>0?'ทำลายสถิติได้ถ้ารอดคลื่นนี้!':'ป้องกันป้อมให้รอด 90 วินาที')}
+  Object.values(P).forEach(p=>{p.kills=0;p.dmg=0;p.rz=0});wx=pickWeather();
+  const bossWave=round.n%5===0;banner(bossWave?`คลื่นที่ ${round.n} : คลื่นบอสใหญ่!`:`คลื่นที่ ${round.n}`,bossWave?'#c98aff':'#fff',round.n>=best&&best>0?'ทำลายสถิติได้ถ้ารอดคลื่นนี้!':'ป้องกันป้อมให้รอด 90 วินาที');
+  if(wx!=='clear')banner('พยากรณ์: '+WXc().n,'#8cc8ff',WXc().sub);
+  if(bossWave)pending.push({t:NOW+12,fn:giantBoss})}
+function giantBoss(){const z=spawnZ('boss',null,540,SPAWN_Y+40);z.hp*=3;z.max=z.hp;z.s=4.2;z.giant=true;shake=50;banner('บอสใหญ่มาแล้ว!','#c98aff','ทุกคนกดหัวใจยิงบอส!')}
 
 // ---------- update ----------
 function update(dt){
@@ -477,6 +516,7 @@ function update(dt){
   // ซอมบี้ของคนดูที่ยังเล่นอยู่ เกิดใหม่เองหลังตาย 1.5 วิ
   if(round.state==='play')activeOf('z').forEach(p=>{if(!myZombie(p.name)&&NOW>=(p.respawnAt||0)){p.respawnAt=NOW+1.5;spawnZ('player',p)}});
   if(round.state==='end'){if(NOW-round.endT>INTER)newRound();zs.forEach(z=>z.hp>0&&round.win==='h'&&hurt(z,999));}
+  else if(round.state==='lobby'){round.t0=NOW;zs=zs.filter(z=>z.hp>0);zs.forEach(z=>hurt(z,999))}
   else{
     const el=NOW-round.t0;
     const nP=activeOf('h').length,aliveZ=zs.filter(z=>z.hp>0).length,want=Math.min(40,4+nP*1.6+round.n*1.2);
@@ -488,7 +528,7 @@ function update(dt){
     for(const t of turrets)shoot(t,dt);
     for(const z of zs){if(z.hp<=0)continue;
       if(z.by&&P[z.by]&&z.y>RANGE_H){const v=dt*(z.kind==='mini'?0.5:2);P[z.by].totD=(P[z.by].totD||0)+v;P[z.by].rz=(P[z.by].rz||0)+v}
-      const spd=z.sp*(frenzy>NOW?1.6:1);
+      const spd=z.sp*(frenzy>NOW?1.6:1)*WXc().zsp;
       if(z.kind==='spitter'||z.kind==='boss'){const stop=z.kind==='boss'?700:780;
         if(z.y<stop){z.y+=spd*dt;z.x+=Math.sin(NOW*2+z.wob)*10*dt;z.x=clamp(z.x,60,1020)}
         else{z.cd=(z.cd??0.4)-dt;if(z.cd<=0){z.cd=z.kind==='boss'?1.6:2.4;spit(z)}
@@ -590,6 +630,7 @@ function render(){
       g.fillStyle='#3e4a3a';g.fillRect(x-80,y-12,160,24);g.fillRect(x-20,y-70,40,140);g.fillRect(x-80,y-30,26,60);g.fillStyle='#2c3529';g.fillRect(x+60,y-8,30,16);glow(x-90,y,40,'rgba(255,170,80,1)',0.5)}
     else if(f.type==='tank'){const x=540,y=WALL_TOP-10,up=Math.min(1,t/0.3);g.globalAlpha=Math.min(1,(f.life-t)/0.3);g.fillStyle='#3e4a32';g.fillRect(x-90,y-60*up,180,70*up);g.fillStyle='#2c3524';g.fillRect(x-100,y-6,200,22);
       g.fillStyle='#4f5d3f';g.fillRect(x-45,y-100*up,90,50*up);g.fillStyle='#262b20';g.fillRect(x-10,y-210*up,20,120*up);g.globalAlpha=1}});
+  try{drawWeather()}catch(e){}
   const vg=g.createRadialGradient(540,900,300,540,900,1150);vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,'rgba(10,8,6,.55)');g.fillStyle=vg;g.fillRect(0,0,W,H);
   if(frenzy>NOW){const fr2=g.createRadialGradient(540,800,420,540,800,1100);fr2.addColorStop(0,'rgba(0,0,0,0)');fr2.addColorStop(1,`rgba(170,20,10,${0.35+0.12*Math.sin(NOW*8)})`);g.fillStyle=fr2;g.fillRect(-200,-200,W+400,H+400)}
   if(round.state==='end'&&round.win==='z'){g.fillStyle='rgba(120,0,0,.25)';g.fillRect(0,0,W,H)}
@@ -615,7 +656,7 @@ function render(){
   panel(16,SAFE_T,1048,104,'#ffffff');
   const left=Math.max(0,Math.ceil(ROUND-(NOW-round.t0)));
   txt(`คลื่นที่ ${round.n}`,40,SAFE_T+44,34,'#fff');
-  txt(round.state==='play'?`เหลือ ${left} วิ`:'จบคลื่น',540,SAFE_T+46,42,left<=10&&round.state==='play'?'#ff6a6a':'#f0c86a','center');
+  txt(paused?'หยุดชั่วคราว':round.state==='lobby'?'รอเริ่มเกม':round.state==='play'?`เหลือ ${left} วิ`:'จบคลื่น',540,SAFE_T+46,42,left<=10&&round.state==='play'?'#ff6a6a':'#f0c86a','center');
   txt(`สถิติ ${best?'คลื่น '+best:'-'}`,1040,SAFE_T+44,28,'#ffd04a','right',700);
   txt('กำแพง',40,SAFE_T+88,24,'#fff');
   const wv=round.wall/MAXWALL;g.fillStyle='#222';g.fillRect(130,SAFE_T+66,904,28);g.fillStyle=wv<0.3?'#d9473b':wv<0.6?'#e09a4a':'#7fb85a';g.fillRect(133,SAFE_T+69,898*wv,22);
@@ -627,6 +668,10 @@ function render(){
     items.forEach(([id,n],i)=>{const x=170+i*170;if(id){drawImg(GIMG[id],x,y0+90,40);txt(n,x+26,y0+100,24,'#f0c86a','left',700)}else txt(n,x-10,y0+100,22,'#ff9aa8','left',700)})}
   if(!DEMO&&live.state!=='live')txt({connecting:'กำลังต่อไลฟ์...',offline:'รอไลฟ์เริ่ม...',error:'ต่อไลฟ์ไม่ได้',server:'ไม่เจอ server.js'}[live.state]||'',540,SAFE_T+262,24,'#e09a4a','center',500);
 
+  if(round.state==='lobby'&&!cine.cur){const k=0.85+0.15*Math.sin(NOW*3);g.globalAlpha=k;panel(110,640,860,220,'#f0c86a',0.9);txt('เกมกำลังจะเริ่ม',540,722,58,'#f0c86a','center');txt('กดหัวใจ ขึ้นกำแพงรอได้เลย',540,792,36,'#fff','center',600);txt(`พร้อมแล้ว ${activeOf('h').length} คน`,540,840,28,'#8cc8ff','center',600);g.globalAlpha=1}
+  if(paused){g.fillStyle='rgba(0,0,0,.45)';g.fillRect(0,0,W,H);panel(190,700,700,150,'#ffffff',0.92);txt('พักแป๊บนึง',540,775,56,'#fff','center');txt('เดี๋ยวกลับมาสู้ต่อ',540,825,30,'#cfcfcf','center',600)}
+  if(wx!=='clear'){const t=WXc().n;g.font=`700 24px ${FONT}`;const w=g.measureText(t).width+40;g.fillStyle='rgba(14,16,20,.85)';g.beginPath();g.roundRect(1064-w,SAFE_T+240,w,40,20);g.fill();g.strokeStyle='#8cc8ff';g.lineWidth=3;g.stroke();txt(t,1064-w/2,SAFE_T+268,24,'#8cc8ff','center',700)}
+  if(wx==='dark'&&round.state==='play'){const y=SAFE_T+290,k=torchProg/torchNeed();panel(140,y,800,56,'#ffb04a',0.88);heart(176,y+28,26);txt(`กดหัวใจจุดคบเพลิง ${torchProg}/${torchNeed()}`,206,y+26,24,'#ffb04a','left',700);g.fillStyle='#222';g.fillRect(206,y+34,710,12);g.fillStyle='#ffb04a';g.fillRect(208,y+36,706*k,8);txt(`${torches.length}/5`,916,y+26,22,'#fff','right',600)}
   {const tags=[];if(fog>NOW)tags.push([`หมอกควัน ${Math.ceil(fog-NOW)} วิ`,'#b9c4a8']);if(frenzy>NOW)tags.push([`ฝูงคลั่ง ${Math.ceil(frenzy-NOW)} วิ`,'#e5566b']);
     tags.forEach(([t,c],i)=>{const x=540+(i-(tags.length-1)/2)*250;g.fillStyle='rgba(14,16,20,.85)';g.beginPath();g.roundRect(x-115,SAFE_T+240,230,40,20);g.fill();g.strokeStyle=c;g.lineWidth=3;g.stroke();txt(t,x,SAFE_T+268,24,c,'center',700)})}
   if(round.state==='play'&&!activeOf('h').length&&!activeOf('z').length&&!cine.cur){const k=0.75+0.25*Math.sin(NOW*4);g.globalAlpha=k;
@@ -704,27 +749,46 @@ if(Q.has('test')){const me='ผู้ทดสอบ',bar=document.createElement
 // ---------- ข้อมูลจริงจาก server.js ----------
 const ids={},used={};
 function nameFor(id,name){if(ids[id])return ids[id];let n=name,i=2;while(used[n]&&used[n]!==id)n=`${name}${i++}`;used[n]=id;return ids[id]=n}
+function control(c){const a=c.arg;
+  if(c.cmd==='start'){paused=false;round.next=Math.max(1,+a||1);newRound()}
+  else if(c.cmd==='lobby'){paused=false;round.state='lobby';round.next=null;evWarn=null;banner('พักก่อน','#fff','กดหัวใจขึ้นกำแพงรอได้เลย')}
+  else if(c.cmd==='pause')paused=true;
+  else if(c.cmd==='resume')paused=false;
+  else if(c.cmd==='skip'&&round.state==='play')endRound('h');
+  else if(c.cmd==='lose'&&round.state==='play'){round.wall=0}
+  else if(c.cmd==='repair'){round.wall=MAXWALL;popup('ซ่อมกำแพงเต็ม!',540,1080,'#9fe08a',38)}
+  else if(c.cmd==='weather'&&WX[a]){wx=a;torches=[];torchProg=0;banner('พยากรณ์: '+WXc().n,'#8cc8ff',WXc().sub)}
+  else if(c.cmd==='wxlock')wxLock=WX[a]?a:null;
+  else if(c.cmd==='event'&&round.state==='play'){if(a==='giant')giantBoss();else if(EVS[a]){evWarn={k:a,t:NOW+3};banner('ระวัง! '+EVS[a].n,EVS[a].col,EVS[a].sub)}}
+  else if(c.cmd==='autoev')autoEv=!!a;
+  else if(c.cmd==='reload')location.reload();
+  sendState()}
+let wsRef=null;
+function sendState(){if(!wsRef||wsRef.readyState!==1)return;const ps=activeOf('h');
+  wsRef.send(JSON.stringify({type:'state',game:'siege',state:paused?'paused':round.state,wave:round.n,left:Math.max(0,Math.ceil(ROUND-(NOW-round.t0))),wall:Math.round(round.wall),players:ps.length,zombies:zs.filter(z=>z.hp>0).length,weather:wx,wxLock,autoEv,best,live:live.state}))}
+setInterval(sendState,1000);
 function onLive(ev){
   if(ev.type==='status'){live={...live,...ev};return}
+  if(ev.type==='control'){control(ev);return}
   const name=ev.id?nameFor(ev.id,ev.name):ev.name;
   if(ev.type==='chat')comment(name,ev.text,ev.pic);
   else if(ev.type==='like')like(name,ev.count||1,ev.pic);
   else if(ev.type==='gift')gift(name,ev.coins||1,ev.giftId,ev.img,ev.pic);
   else if(ev.type==='follow')follow(name,ev.pic,ev.repeat);
 }
-if(!DEMO){let wsT=0;const open=()=>{const ws=new WebSocket(`ws://${location.host}/ws`);
+if(!DEMO){let wsT=0;const open=()=>{const ws=new WebSocket(`ws://${location.host}/ws`);wsRef=ws;
   ws.onmessage=m=>{try{onLive(JSON.parse(m.data))}catch(e){console.error(e)}};
   ws.onclose=()=>{live.state='server';clearTimeout(wsT);wsT=setTimeout(open,2000)}};open()}
 
 // ---------- loop ----------
 let last=performance.now();
-banner('คลื่นที่ 1','#fff','ป้องกันป้อมให้รอด 90 วินาที');
+if(DEMO)banner('คลื่นที่ 1','#fff','ป้องกันป้อมให้รอด 90 วินาที');
 // ?t=45 จำลองข้ามไปวินาทีที่ 45 (ไว้ตรวจหน้าจอ)
 const START=+Q.get('t')||0;PRESIM=true;for(let t=0;t<START;t+=1/30){NOW+=1/30;update(1/30)}PRESIM=false;
 // กันเกมค้างในไลฟ์: error ส่วนไหนก็ตาม เฟรมถัดไปยังเดินต่อ และเริ่มวาดจากสถานะสะอาดทุกเฟรม
 let errShown=0;
-function loop(t){requestAnimationFrame(loop);const dt=Math.min(0.05,(t-last)/1000)*SPEED;last=t;NOW+=dt;
-  try{update(dt)}catch(e){if(errShown++<5)console.error('update',e)}
+function loop(t){requestAnimationFrame(loop);const dt=Math.min(0.05,(t-last)/1000)*SPEED;last=t;if(!paused)NOW+=dt;
+  try{if(!paused)update(dt)}catch(e){if(errShown++<5)console.error('update',e)}
   shake*=0.86;
   try{g.setTransform(1,0,0,1,0,0);g.globalAlpha=1;g.globalCompositeOperation='source-over';render()}catch(e){if(errShown++<5)console.error('render',e)}}
 document.fonts.load(`700 40px Kanit`).finally(()=>requestAnimationFrame(loop));
