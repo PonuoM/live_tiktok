@@ -21,8 +21,9 @@ import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
 import {UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';
 import {OutputPass} from 'three/addons/postprocessing/OutputPass.js';
 import {Reflector} from 'three/addons/objects/Reflector.js';
+import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 
-const Q=new URLSearchParams(location.search),DEMO=Q.has('demo')||Q.has('test'),SHOWSAFE=Q.has('safe');
+const Q=new URLSearchParams(location.search),DEMO=Q.has('demo')||Q.has('test')||Q.has('model'),SHOWSAFE=Q.has('safe');
 const W=1080,H=1920,FONT='Kanit, Tahoma, sans-serif',SAFE_T=72,SAFE_B=1390,IDLE=25;
 const rnd=(a,b)=>a+Math.random()*(b-a),pick=a=>a[Math.random()*a.length|0],clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const short=(s,n=10)=>s.length>n?s.slice(0,n)+'…':s;
@@ -92,13 +93,13 @@ function makeWalker(col,p){const gr=new THREE.Group(),m=new THREE.MeshStandardMa
   const legs=new THREE.Mesh(new THREE.CylinderGeometry(0.45,0.4,0.8,8),new THREE.MeshStandardMaterial({color:0x2a2a38}));legs.position.y=0.4;gr.add(legs);
   const head=new THREE.Mesh(new THREE.SphereGeometry(0.38,10,8),new THREE.MeshStandardMaterial({color:pick(SKIN)}));head.position.y=2.25;gr.add(head);
   const hair=new THREE.Mesh(new THREE.SphereGeometry(0.4,10,6,0,Math.PI*2,0,Math.PI/2),new THREE.MeshStandardMaterial({color:0x1a1416}));hair.position.y=2.3;gr.add(hair);
-  gr.scale.setScalar(p?1.9:1.6);gr.position.set(rnd(-45,45),0,SHORE-rnd(1.5,5));scene.add(gr);
+  gr.scale.setScalar(p?1.9:1.6);gr.position.set(p?rnd(-19,19):rnd(-45,45),0,SHORE-rnd(1.5,5));scene.add(gr);
   const w={g:gr,p,dir:pick([-1,1]),sp:rnd(1.2,2.4),stop:0,ph:rnd(0,9)};walkers.push(w);return w}
 for(let i=0;i<26;i++)makeWalker(pick([0xa85a4a,0x4a6a8a,0x8a7a4a,0x6a4a7a,0x4a7a6a,0x9a6a3a,0xc0c0c8,0xd08aa0]));
 function updWalkers(dt){for(let i=walkers.length-1;i>=0;i--){const w=walkers[i];if(w.p&&NOW-w.p.last>90){scene.remove(w.g);walkers.splice(i,1);w.p.walker=null}}
   for(const w of walkers){const g=w.g;if(w.p&&w.leave){g.position.y-=dt*0;}
   if(w.stop>0){w.stop-=dt;g.rotation.y=Math.PI*0.9}else{g.position.x+=w.dir*w.sp*dt;g.rotation.y=w.dir>0?Math.PI/2:-Math.PI/2;g.position.y=Math.abs(Math.sin(NOW*7+w.ph))*0.12;
-    if(g.position.x>46)w.dir=-1;if(g.position.x<-46)w.dir=1;if(Math.random()<dt*0.05)w.stop=rnd(1.5,4)}}}
+    const lim=w.p?21:46;if(g.position.x>lim)w.dir=-1;if(g.position.x<-lim)w.dir=1;if(Math.random()<dt*0.05)w.stop=rnd(1.5,4)}}}
 // คนดูที่เข้ามาได้ตัวเดินในงานของตัวเอง โคมของคนนั้นลอยขึ้นจากตรงที่เขายืน
 function walkerOf(p){if(!p||p.sample)return null;if(!p.walker){p.walker=makeWalker(new THREE.Color().setHSL(Math.random(),0.55,0.55).getHex(),p);p.walker.sp=rnd(1.5,2.6)}return p.walker}
 scene.add(new THREE.HemisphereLight(0x8a90d0,0x1a1830,1.1));
@@ -109,26 +110,79 @@ const flies=[];for(let i=0;i<26;i++){const s=glowSprite(0xffe08a,rnd(.5,.9),.8);
 const composer=new EffectComposer(renderer);composer.setSize(W,H);composer.addPass(new RenderPass(scene,camera));
 const bloom=new UnrealBloomPass(new THREE.Vector2(W/2,H/2),0.55,0.4,0.62);composer.addPass(bloom);composer.addPass(new OutputPass());
 
-// ---------- โคม ----------
-const latheG=new THREE.LatheGeometry([[0.5,0],[0.58,0.08],[0.72,0.55],[0.84,1.25],[0.9,1.75],[0.86,1.82]].map(([x,y])=>new THREE.Vector2(x,y)),16);
-const KIND={plain:{c:0xffd8a0,e:0xff7a20,ei:0.9,s:0.75},flower:{c:0xffc8dc,e:0xff5a8a,ei:1.0,s:0.85},gold:{c:0xffe8a0,e:0xffa010,ei:1.3,s:1.05},giant:{c:0xfff0c0,e:0xffb030,ei:1.5,s:1.35},sample:{c:0xe0d4c0,e:0xff8a40,ei:0.7,s:0.65}};
+// ---------- โคม: ปั้นด้วยโค้ดตามภาพต้นแบบ ref/lantern_a.png (โคมลอยกระดาษสา 8 กลีบ ขอบไม้ไผ่ ลวดไขว้ แผ่นเชื้อเพลิง) และ ref/lantern_b.png (แถบแดง แถบทอง) ----------
+// สัดส่วนวัดจากภาพ: สูง 1.35 เท่าของส่วนกว้างสุด ปากล่างกว้าง 0.8 เท่า ส่วนกว้างสุดอยู่ราว 70% ของความสูง ยอดโค้งมนแล้วจีบเข้าหากัน
+// ดูโมเดลใกล้ๆ ได้ที่ /play/lantern?model=1&kind=plain,flower,gold,giant
+const PANELS=8,PROFILE=[[0.72,0],[0.735,0.25],[0.78,0.7],[0.84,1.15],[0.885,1.5],[0.9,1.75],[0.865,1.97],[0.77,2.14],[0.58,2.29],[0.35,2.39],[0.15,2.435],[0.03,2.45]];
+function prng(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+// ตัวโคม: หมุนเส้นโครงรอบแกน แล้วให้กระดาษแต่ละกลีบโป่งออกเล็กน้อยระหว่างตะเข็บ ผิวยับนิดๆ
+const latheG=(()=>{const geo=new THREE.LatheGeometry(new THREE.SplineCurve(PROFILE.map(([x,y])=>new THREE.Vector2(x,y))).getSpacedPoints(24),40),p=geo.attributes.position,col=new Float32Array(p.count*3);
+  for(let i=0;i<p.count;i++){const x=p.getX(i),y=p.getY(i),z=p.getZ(i),t=Math.min(1,y/1.5),c=0.3+0.7*t*t*(3-2*t);col[i*3]=col[i*3+1]=col[i*3+2]=c;if(Math.hypot(x,z)<0.02)continue;const a=Math.atan2(x,z);
+    const k=1+(0.022+0.03*Math.min(1,Math.max(0,(y-1.2)/1.0)))*(1-Math.abs(Math.cos(a*PANELS/2)))*Math.min(1,y/0.5)+0.006*Math.sin(a*19+y*13)+0.005*Math.sin(a*31-y*23);p.setX(i,x*k);p.setZ(i,z*k)}
+  geo.setAttribute('color',new THREE.BufferAttribute(col,3));geo.computeVertexNormals();return geo})();
+function canvasTex(w,h,draw){const c=document.createElement('canvas');c.width=w;c.height=h;draw(c.getContext('2d'),w,h);const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.wrapS=THREE.RepeatWrapping;t.anisotropy=4;return t}
+function crumple(x,w,h,R,n,al){x.filter='blur(1.4px)';for(let i=0;i<n;i++){const cx=R()*w,cy=R()*h,s=6+R()*22;x.fillStyle=R()<0.5?`rgba(255,255,255,${al*R()})`:`rgba(40,20,5,${al*R()})`;
+  x.beginPath();x.moveTo(cx+(R()-.5)*s,cy+(R()-.5)*s);x.lineTo(cx+(R()-.5)*s,cy+(R()-.5)*s);x.lineTo(cx+(R()-.5)*s,cy+(R()-.5)*s);x.fill()}x.filter='none'}
+function seams(x,w,h,style,half){x.fillStyle=style;for(let k=0;k<=PANELS;k++)x.fillRect(k*w/PANELS-half,0,half*2,h)}
+// เนื้อกระดาษสา: เส้นใย รอยยับ ตะเข็บกระดาษซ้อนสองชั้น
+const PAPER=canvasTex(512,512,(x,w,h)=>{const R=prng(11);x.fillStyle='#fff';x.fillRect(0,0,w,h);crumple(x,w,h,R,1100,0.12);
+  x.strokeStyle='rgba(120,90,60,.10)';x.lineWidth=1;for(let i=0;i<900;i++){const fx=R()*w,fy=R()*h,a=R()*6.28,l=4+R()*14;x.beginPath();x.moveTo(fx,fy);x.lineTo(fx+Math.cos(a)*l,fy+Math.sin(a)*l);x.stroke()}
+  seams(x,w,h,'rgba(150,115,80,.08)',2.6);seams(x,w,h,'rgba(130,95,60,.15)',0.9)});
+// stops = สีแสงที่ทะลุกระดาษ ไล่จากปากโคม (ใกล้ไฟ สว่างสุด) ขึ้นไปถึงยอด
+const KIND={
+ plain:{c:0xfff0d8,g:0xff8a30,ei:1.0,s:0.75,stops:['#ff9c34','#f5842e','#bf6a3c','#54402f']},
+ flower:{c:0xffd8e4,g:0xff6a9a,ei:1.05,s:0.85,stops:['#ff8a8a','#ff6e8c','#d7507d','#6a3550'],deco:'flower'},
+ gold:{c:0xfff0c0,g:0xffb030,ei:1.25,s:1.05,stops:['#ffc040','#ffac2a','#e19628','#6e5028'],deco:'bands'},
+ giant:{c:0xfff6e0,g:0xffc040,ei:1.4,s:1.35,stops:['#ffc870','#ffb450','#eba05f','#80624a'],deco:'bands'},
+ sample:{c:0xe8dccc,g:0xff8a40,ei:0.75,s:0.65,stops:['#e6c8a0','#dc8c5a','#a06446','#5a4137']}};
+const glowMaps={};
+function glowMap(kind){if(glowMaps[kind])return glowMaps[kind];const K=KIND[kind];
+  return glowMaps[kind]=canvasTex(512,512,(x,w,h)=>{const R=prng(23),gr=x.createLinearGradient(0,h,0,0);[0,0.2,0.58,1].forEach((s,i)=>gr.addColorStop(s,K.stops[i]));x.fillStyle=gr;x.fillRect(0,0,w,h);
+    crumple(x,w,h,R,1100,0.10);seams(x,w,h,'rgba(70,30,8,.09)',2.6);seams(x,w,h,'rgba(60,25,5,.15)',0.9);
+    deco(x,w,h,K,true)})}
+// ลายตกแต่งของโคมของขวัญ: แถบแดงกับแถบทอง (ตาม ref/lantern_b.png) และดอกไม้ วาดทั้งบนเนื้อกระดาษและบนแสงที่ทะลุออกมา
+function deco(x,w,h,K,em){
+  if(K.deco==='bands'){x.fillStyle=em?'rgba(215,40,35,.9)':'rgba(190,30,30,.92)';x.fillRect(0,h*0.35,w,h*0.028);x.fillStyle=em?'rgba(120,85,10,.78)':'rgba(205,165,50,.95)';x.fillRect(0,h*0.925,w,h*0.05);x.fillStyle=em?'rgba(255,225,120,.5)':'rgba(255,235,150,.9)';x.fillRect(0,h*0.925,w,h*0.008)}
+  if(K.deco==='flower')for(let k=0;k<PANELS;k++){const cx=(k+0.5)*w/PANELS,cy=h*0.5;x.fillStyle=em?'rgba(255,245,250,.6)':'rgba(255,255,255,.92)';
+    for(let j=0;j<5;j++){const a=j/5*6.283-1.57;x.beginPath();x.ellipse(cx+Math.cos(a)*7,cy+Math.sin(a)*13,5,9,0,0,7);x.fill()}x.fillStyle='rgba(255,210,90,.9)';x.beginPath();x.ellipse(cx,cy,3.2,5.5,0,0,7);x.fill()}}
+const paperMaps={};
+function paperMap(kind){const d=KIND[kind].deco||'none';if(!paperMaps[d])paperMaps[d]=d==='none'?PAPER:canvasTex(512,512,(x,w,h)=>{x.drawImage(PAPER.image,0,0);deco(x,w,h,KIND[kind],false)});return paperMaps[d]}
+// โครงใต้โคม รวมเป็นชิ้นเดียว: ขอบไม้ไผ่ เชือกมัด 8 จุด ลวดไขว้ 2 เส้น แผ่นเชื้อเพลิง
+const HARDWARE=(()=>{const parts=[],R0=PROFILE[0][0],add=(geo,hex)=>{const c=new THREE.Color(hex),n=geo.attributes.position.count,a=new Float32Array(n*3);for(let i=0;i<n;i++){a[i*3]=c.r;a[i*3+1]=c.g;a[i*3+2]=c.b}geo.setAttribute('color',new THREE.BufferAttribute(a,3));parts.push(geo)};
+  const ring=new THREE.TorusGeometry(R0,0.02,6,40);ring.rotateX(Math.PI/2);ring.translate(0,0.01,0);add(ring,0xd2ad72);
+  for(let k=0;k<PANELS;k++){const a=k/PANELS*Math.PI*2,b=new THREE.CylinderGeometry(0.028,0.028,0.05,6);b.rotateZ(Math.PI/2);b.rotateY(-(a+Math.PI/2));b.translate(R0*Math.cos(a),0.01,R0*Math.sin(a));add(b,0x9c7a48)}
+  for(const a of [Math.PI/4,-Math.PI/4]){const wire=new THREE.CylinderGeometry(0.008,0.008,R0*2,4);wire.rotateZ(Math.PI/2);wire.rotateY(a);wire.translate(0,0.035,0);add(wire,0x8f8f8c)}
+  const disc=new THREE.CylinderGeometry(0.135,0.135,0.06,14);disc.translate(0,0.05,0);add(disc,0x6a3a18);
+  return mergeGeometries(parts)})();
+const HW_MAT=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.75,emissive:0x7a4410,emissiveIntensity:0.5});
+function buildLantern(kind){const K=KIND[kind],g=new THREE.Group();
+  const mat=new THREE.MeshStandardMaterial({color:K.c,map:paperMap(kind),emissive:0xffffff,emissiveMap:glowMap(kind),emissiveIntensity:K.ei,side:THREE.DoubleSide,roughness:.9,transparent:true,opacity:.97,bumpMap:PAPER,bumpScale:1.2,vertexColors:true});
+  g.add(new THREE.Mesh(latheG,mat));
+  const hw=new THREE.Mesh(HARDWARE,HW_MAT);g.add(hw);
+  const flame=glowSprite(0xffc860,0.5,0.95);flame.scale.set(0.42,0.66,1);flame.position.y=0.26;g.add(flame);
+  const gl=glowSprite(K.g,3.0,0.45);gl.position.y=1.2;g.add(gl);
+  return {g,mat,hw,flame,gl}}
 let lanterns=[];
-function makeLantern(p,wish,kind='plain',opt={}){const K=KIND[kind],g=new THREE.Group();
-  const mat=new THREE.MeshStandardMaterial({color:K.c,emissive:K.e,emissiveIntensity:K.ei,side:THREE.DoubleSide,roughness:.85,transparent:true,opacity:.96});
-  const body=new THREE.Mesh(latheG,mat);g.add(body);
-  const flame=new THREE.Mesh(new THREE.SphereGeometry(0.16,8,6),new THREE.MeshBasicMaterial({color:0xfff0a0}));flame.position.y=0.15;g.add(flame);
-  const gl=glowSprite(K.e,2.6,0.45);gl.position.y=0.9;g.add(gl);
+function dropLantern(L){scene.remove(L.g);L.mat.dispose();L.gl.material.dispose();L.flame.material.dispose()}
+function makeLantern(p,wish,kind='plain',opt={}){const K=KIND[kind],o=buildLantern(kind),g=o.g;
   const sc=2.3*K.s*(1+Math.min(0.5,(p&&p.hearts||0)/600));g.scale.setScalar(sc);
   const wk=walkerOf(p),src=wk?wk.g.position:(opt.x!=null?null:pick(walkers).g.position);if(wk){wk.stop=3}
-  g.position.set(opt.x??src.x,3.5,opt.z??src.z);scene.add(g);
-  const L={g,mat,gl,p,wish,kind,born:NOW,vy:rnd(2.0,2.8)*(kind==='giant'?0.8:1),vx:rnd(-0.55,0.45),ph:rnd(0,9),boost:0,boostT:-9,fade:1,ei:K.ei,sc};
-  lanterns.push(L);if(lanterns.length>70){const o=lanterns.shift();scene.remove(o.g)}return L}
+  g.position.set(opt.x??clamp(src.x,-21,21),3.5,opt.z??src.z);g.rotation.y=rnd(0,6.28);scene.add(g);
+  const L={...o,p,wish,kind,born:NOW,vy:rnd(2.0,2.8)*(kind==='giant'?0.8:1),vx:rnd(-0.55,0.45),ph:rnd(0,9),boost:0,boostT:-9,fade:1,ei:K.ei,sc};
+  lanterns.push(L);if(lanterns.length>70)dropLantern(lanterns.shift());return L}
 function updLanterns(dt){for(const L of lanterns){const t=NOW-L.born;L.boost=Math.max(0,L.boost-dt*0.5);
   const up=L.vy*(t<2?0.4+0.3*t:1)+L.boost*1.8;L.g.position.y+=up*dt;L.g.position.x+=(L.vx+Math.sin(NOW*0.4+L.ph)*0.35)*dt;L.g.position.z-=0.9*dt;
   L.g.rotation.y+=dt*0.3;L.g.rotation.z=Math.sin(NOW*1.3+L.ph)*0.06;
   const fl=0.85+0.12*Math.sin(NOW*13+L.ph)+0.06*Math.random();L.mat.emissiveIntensity=L.ei*fl*(1+L.boost*0.6);L.gl.material.opacity=0.45*L.fade*(1+L.boost*0.5);
-  const top=120;if(L.g.position.y>top-15){L.fade=clamp((top-L.g.position.y)/15,0,1);L.mat.opacity=0.96*L.fade}}
-  lanterns=lanterns.filter(L=>{if(L.fade<=0.01){scene.remove(L.g);L.mat.dispose();return false}return true})}
+  L.flame.scale.set(0.42*(0.8+0.25*fl),0.66*(0.7+0.4*fl),1);
+  const top=120;if(L.g.position.y>top-15){L.fade=clamp((top-L.g.position.y)/15,0,1);L.mat.opacity=0.97*L.fade;L.flame.material.opacity=0.95*L.fade;L.hw.visible=L.fade>0.5}}
+  lanterns=lanterns.filter(L=>{if(L.fade<=0.01){dropLantern(L);return false}return true})}
+// ---------- โหมดดูโมเดล: โคมบนพื้นเทา แสงสตูดิโอ มุมเงยเหมือนภาพต้นแบบ ไว้เทียบสัดส่วนและรายละเอียด ----------
+const MODEL=Q.has('model');let modelView=null;
+if(MODEL){const ms=new THREE.Scene();ms.background=new THREE.Color(0xb4b7bb);ms.add(new THREE.HemisphereLight(0xffffff,0x5a5a5a,1.05));const dl=new THREE.DirectionalLight(0xffffff,0.55);dl.position.set(3,6,8);ms.add(dl);
+  const kinds=(Q.get('kind')||'plain').split(',').filter(k=>KIND[k]),cam=new THREE.PerspectiveCamera(30,W/H,0.1,100);
+  const items=kinds.map((k,i)=>{const o=buildLantern(k);o.g.position.set((i%2-(Math.min(2,kinds.length)-1)/2)*2.3,-(i>>1)*3.1,0);o.g.rotation.y=+Q.get('rot')||0.2;ms.add(o.g);return o});
+  const rowsN=Math.ceil(kinds.length/2);cam.position.set(0,-2.1-(rowsN-1)*1.55,kinds.length>1?(rowsN>1?17:12.5):10.2);cam.lookAt(0,1.15-(rowsN-1)*1.55,0);modelView={ms,cam,items}}
 
 // ---------- พลุ ----------
 let fireworks=[];
@@ -208,15 +262,16 @@ function drawImg(im,x,y,s){if(im&&im.complete&&im.naturalWidth){g.drawImage(im,x
 function avatar(p,x,y,r,ring){if(!p)return;g.save();g.beginPath();g.arc(x,y,r+3,0,7);g.fillStyle=ring;g.fill();g.beginPath();g.arc(x,y,r,0,7);g.clip();
   if(p.pic&&p.pic.complete&&p.pic.naturalWidth)g.drawImage(p.pic,x-r,y-r,r*2,r*2);else{g.fillStyle=p.shirt||'#6a5a8a';g.fillRect(x-r,y-r,r*2,r*2);g.font=`700 ${r}px ${FONT}`;g.textAlign='center';g.fillStyle='#fff';g.fillText((p.name||'?').slice(0,1).toUpperCase(),x,y+r*0.36)}g.restore()}
 const V=new THREE.Vector3();
-function screenOf(L){V.setFromMatrixPosition(L.g.matrixWorld);V.y+=2.3*L.sc;V.project(camera);return {x:(V.x*0.5+0.5)*W,y:(-V.y*0.5+0.5)*H,ok:V.z<1}}
+function screenOf(L){V.setFromMatrixPosition(L.g.matrixWorld);V.y+=2.95*L.sc;V.project(camera);return {x:(V.x*0.5+0.5)*W,y:(-V.y*0.5+0.5)*H,ok:V.z<1}}
 function bubble(text,x,y){const t=text.length>22?text.slice(0,21)+'…':text;g.font=`600 26px ${FONT}`;const w=Math.max(80,g.measureText(t).width+30),h=44,bx=clamp(x-w/2,12,W-12-w);
   g.fillStyle='rgba(255,250,235,.95)';g.beginPath();g.roundRect(bx,y-h,w,h,16);g.fill();g.beginPath();g.moveTo(x-9,y-1);g.lineTo(x+9,y-1);g.lineTo(x,y+12);g.fill();g.fillStyle='#3a2a50';g.textAlign='center';g.fillText(t,bx+w/2,y-13)}
 function drawWalkerTags(){for(const w of walkers){if(!w.p||NOW-w.p.last>12)continue;V.setFromMatrixPosition(w.g.matrixWorld);V.y+=5.6;V.project(camera);if(V.z>1)continue;
   const x=(V.x*0.5+0.5)*W,y=(-V.y*0.5+0.5)*H;avatar(w.p,x,y-16,16,'#9fe08a');txt(short(w.p.name,8),x,y+14,18,'#d8f5c0','center',600)}}
 function drawLabels(){drawWalkerTags();const list=lanterns.filter(L=>L.p&&L.fade>0.3).map(L=>({L,s:screenOf(L),age:NOW-Math.max(L.born,L.bubbleT||0)})).filter(o=>o.s.ok&&o.s.y>SAFE_T+300&&o.s.y<SAFE_B+200);
-  list.sort((a,b)=>b.age-a.age);
-  for(const {L,s,age} of list){const big=age<7,a=clamp(big?1:1-(age-7)/14,0,1);if(a<=0)continue;g.globalAlpha=a;
-    if(big){avatar(L.p,s.x,s.y-30,26,'#ffd08a');txt(short(L.p.name,10),s.x,s.y+12,24,'#ffe9c0','center',700);if(L.wish)bubble(L.wish,s.x,s.y-66)}
+  const newest=new Map();for(const o of list){const q=newest.get(o.L.p);if(!q||o.age<q.age)newest.set(o.L.p,o)}
+  const show=list.filter(o=>newest.get(o.L.p)===o).sort((a,b)=>b.age-a.age),placed=[];
+  for(const {L,s,age} of show){const big=age<7,a=clamp(big?1:1-(age-7)/14,0,1);if(a<=0)continue;g.globalAlpha=a;
+    if(big){avatar(L.p,s.x,s.y-30,26,'#ffd08a');txt(short(L.p.name,10),s.x,s.y+12,24,'#ffe9c0','center',700);if(L.wish){let by=s.y-66;for(let n=0;n<4&&placed.some(r=>Math.abs(r.x-s.x)<240&&Math.abs(r.y-by)<46);n++)by-=48;placed.push({x:s.x,y:by});bubble(L.wish,s.x,by)}}
     else{avatar(L.p,s.x,s.y-14,13,'#ffd08a');if(age<16)txt(short(L.p.name,8),s.x,s.y+12,18,'#ffe9c0','center',600)}
     g.globalAlpha=1}}
 function hud(){
@@ -239,8 +294,8 @@ function drawOverlay(){g.clearRect(0,0,W,H);
   const bn=banners.find(b=>NOW>=b.t&&NOW<b.t+2.4);banners=banners.filter(b=>NOW<b.t+2.4);
   if(bn){const k=ease.back(Math.min(1,(NOW-bn.t)/0.3));g.save();g.translate(540,700);g.scale(k,k);g.translate(-540,-700);panel(90,630,900,bn.sub?150:100,bn.col,0.8);txt(bn.s,540,696,46,bn.col,'center');if(bn.sub)txt(bn.sub,540,750,30,'#fff','center',600);g.restore()}
   const cd=cards.find(c=>NOW>=c.t&&NOW<c.t+3);cards=cards.filter(c=>NOW<c.t+3);
-  if(cd){const k=ease.back(Math.min(1,(NOW-cd.t)/0.35)),a=Math.min(1,(cd.t+3-NOW)*3);g.globalAlpha=a;g.save();g.translate(540,1060);g.scale(k,k);g.translate(-540,-1060);
-    panel(90,980,900,170,'#ffd08a',0.85);avatar(cd.p,200,1065,56,'#ffd08a');txt('ขอบคุณ',282,1036,28,'#ffe9c0','left',500);txt(short(cd.p.name,12),282,1096,52,'#ffd08a','left',700);txt(cd.title,282,1136,26,'#fff','left',600);drawImg(cd.icon,900,1060,96);
+  if(cd){const k=ease.back(Math.min(1,(NOW-cd.t)/0.35)),a=Math.min(1,(cd.t+3-NOW)*3);g.globalAlpha=a;g.save();g.translate(540,430);g.scale(k,k);g.translate(-540,-430);
+    panel(90,350,900,170,'#ffd08a',0.85);avatar(cd.p,200,435,56,'#ffd08a');txt('ขอบคุณ',282,406,28,'#ffe9c0','left',500);txt(short(cd.p.name,12),282,466,52,'#ffd08a','left',700);txt(cd.title,282,506,26,'#fff','left',600);drawImg(cd.icon,900,430,96);
     g.restore();g.globalAlpha=1}
   if(!lanterns.some(L=>L.p&&!L.p.sample&&NOW-L.born<20)&&!bn){const k=0.8+0.2*Math.sin(NOW*3);g.globalAlpha=k;panel(150,1190,780,140,'#ffd08a',0.7);txt('พิมพ์คำอธิษฐานมาเลย',540,1252,46,'#ffd08a','center');txt('แล้วดูโคมของคุณลอยขึ้นฟ้า',540,1302,30,'#fff','center',600);g.globalAlpha=1}
   if(SND.ctx&&SND.ctx.state!=='running'){g.fillStyle='rgba(14,16,20,.8)';g.beginPath();g.roundRect(290,1846,500,52,26);g.fill();txt('คลิกจอ 1 ครั้ง เพื่อเปิดเสียง',540,1882,28,'#ffd08a','center',600)}
@@ -277,7 +332,8 @@ if(!DEMO){let wsT=0;const open=()=>{const ws=new WebSocket(`ws://${location.host
 // ---------- loop ----------
 let last=performance.now(),errN=0;
 function loop(t){requestAnimationFrame(loop);const dt=Math.min(0.05,(t-last)/1000);last=t;NOW+=dt;
-  try{if(crowdOn)sim();attract(dt);updWalkers(dt);wheel.rotation.z+=dt*0.12;bulbs.forEach((b,i)=>{b.material.opacity=0.75+0.25*Math.sin(NOW*2+i*0.7)});updLanterns(dt);updFireworks(dt);
+  try{if(MODEL){modelView.items.forEach(o=>{if(!Q.has('still'))o.g.rotation.y+=dt*0.4;const f=0.85+0.12*Math.sin(NOW*13);o.flame.scale.set(0.42*(0.8+0.25*f),0.66*(0.7+0.4*f),1)});renderer.render(modelView.ms,modelView.cam);g.clearRect(0,0,W,H);return}
+    if(crowdOn)sim();attract(dt);updWalkers(dt);wheel.rotation.z+=dt*0.12;bulbs.forEach((b,i)=>{b.material.opacity=0.75+0.25*Math.sin(NOW*2+i*0.7)});updLanterns(dt);updFireworks(dt);
     flies.forEach(f=>{const u=f.userData;f.position.set(u.b.x+Math.sin(NOW*0.5+u.p)*1.5,u.b.y+Math.sin(NOW*0.8+u.p*2)*0.6,u.b.z+Math.cos(NOW*0.4+u.p)*1.5);f.material.opacity=0.4+0.4*Math.sin(NOW*3+u.p)});
     camera.position.x=Math.sin(NOW*0.07)*1.2;camera.position.y=4.5+Math.sin(NOW*0.11)*0.3;camera.lookAt(LOOK);
     composer.render();drawOverlay()}catch(e){if(errN++<5)console.error(e)}}

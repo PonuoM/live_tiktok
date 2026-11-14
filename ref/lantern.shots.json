@@ -1,0 +1,10 @@
+{
+  "outputDir": "C:/AppServ/www/ซีรีย์แนวตั้ง/tools/live-game/ref",
+  "style": "clean product reference photo for 3D modeling, single object centered and fully visible with margin on all sides, plain flat light grey seamless background, soft even studio light, sharp focus, no text, no logos, no people, no hands, no other objects",
+  "shots": [
+    { "id": "lantern_a", "aspect": "square 1:1",
+      "prompt": "A traditional Thai sky lantern (khom loi) used at Yi Peng festivals. Tall slightly tapered cylinder made of thin cream-white rice paper, about 1.3 times taller than wide, narrower at the bottom opening and wider and rounded at the closed top. Visible paper seams running vertically in 6 panels. A thin natural bamboo hoop forms the bottom rim, with two thin wires crossing the open bottom and a small round fuel disc at the center of the cross. Lit from inside with a warm orange glow so the paper glows softly from orange at the bottom to pale cream at the top, the seams show as slightly darker lines. Three-quarter view from slightly below so the bamboo ring and wire cross are visible. Floating, no strings." },
+    { "id": "lantern_b", "aspect": "square 1:1",
+      "prompt": "A traditional Thai sky lantern (khom loi). Tall tapered cylinder of light orange rice paper with a thin red paper band near the top and a thin gold band near the bottom, about 1.3 times taller than wide, rounded closed top, open bottom with a thin natural bamboo hoop rim, two thin crossing wires and a small fuel disc in the middle. Glowing warmly from inside, brighter near the bottom. 6 vertical paper panels with visible seams. Three-quarter view from slightly below. Floating, no strings." }
+  ]
+}
