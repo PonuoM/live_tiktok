@@ -33,3 +33,5 @@ settings/
 # ภาพเกมจุดเทียนไล่ผี (ต้นฉบับ art/ghost_raw กับภาพคอนเซปต์ไม่ขึ้น git)
 !art/ghost/*.png
 !art/ghost/*.jpg
+# ภาพคนกราบของเกมปิดทองพระ (ต้นฉบับ art/temple_raw ไม่ขึ้น git)
+!art/temple/*.png
