@@ -1,129 +1,214 @@
 <!doctype html>
 <html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>เปิดไลฟ์</title>
-<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;600;700&display=swap" rel="stylesheet">
+<title>จบค้าง LIVE</title>
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600;700&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#14161b;--card:#1d2027;--line:#2c313b;--txt:#e9e6dc;--dim:#a9afb9;--gold:#f0c86a;--live:#e5566b;--ok:#7fb85a;--blue:#3a6698;--pur:#5e4280;--red:#b8364b}
+:root{--bg:#0d131a;--side:#0a0f15;--panel:#151e29;--panel2:#1b2735;--line:#263547;--txt:#e3e7ec;--dim:#9ba7b3;--accent:#66c0f4;--gold:#f0c86a;--live:#e5566b;--ok:#8bc34a;--warn:#ffb347;--r:12px}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--txt);font:400 16px/1.45 Kanit,Tahoma,sans-serif}
-main{max-width:820px;margin:0 auto;padding:20px 16px 60px;display:grid;gap:14px}
-header{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
-h1{font-size:28px;margin:0}
-.pill{padding:5px 14px;border-radius:99px;background:#2a2e37;color:var(--dim);font-weight:600}
-.pill.live{background:var(--live);color:#fff}.pill.ok{background:var(--ok);color:#10140c}
-section{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
-h2{font-size:18px;margin:0 0 10px;display:flex;gap:10px;align-items:center}
-h2 .n{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--gold);color:#14161b;font-size:16px}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--txt);font:400 15px/1.45 Kanit,Tahoma,sans-serif;overflow:hidden}
+button,a.b{font:600 14px Kanit,Tahoma,sans-serif;border:0;border-radius:9px;padding:9px 14px;cursor:pointer;color:var(--txt);background:#26364a;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:background .15s,transform .05s}
+button:hover,a.b:hover{background:#30445c}button:active{transform:translateY(1px)}
+.play{background:linear-gradient(180deg,#4f8a1a,#3a6a10);color:#fff;font-size:17px;padding:12px 22px}.play:hover{background:linear-gradient(180deg,#589a1d,#427812)}
+.blue{background:#2c5d8a}.blue:hover{background:#356fa3}.pur{background:#5a3f80}.pur:hover{background:#6a4b95}.red{background:#9c2f42}.red:hover{background:#b3374c}.go{background:#4f7d17}
+button.on{background:var(--accent);color:#0b1520}
+input[type=text],input[type=number]{font:600 15px Kanit,Tahoma,sans-serif;padding:9px 12px;border-radius:9px;border:1px solid var(--line);background:#0b1118;color:var(--txt);outline:none}
+input:focus{border-color:var(--accent)}
+input[type=range]{accent-color:var(--accent);width:100%}
+.app{display:grid;grid-template-columns:210px 1fr;height:100vh}
+aside{background:var(--side);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:18px 12px;gap:6px}
+.brand{font:700 21px Kanit;letter-spacing:.3px;padding:0 10px 14px;display:flex;align-items:center;gap:8px}
+.brand i{width:10px;height:10px;border-radius:50%;background:var(--live)}
+.brand small{font-weight:300;color:var(--dim);font-size:14px}
+nav button{width:100%;justify-content:flex-start;background:transparent;color:var(--dim);font-size:16px;padding:11px 12px;gap:12px}
+nav button:hover{background:#141d27;color:var(--txt)}
+nav button.cur{background:#1b2a3a;color:#fff;box-shadow:inset 3px 0 0 var(--accent)}
+nav svg{width:20px;height:20px;flex:none}
+.conn{margin-top:auto;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px}
+.conn b{display:block;font-size:16px}.conn span{color:var(--dim);font-size:13px}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#56606b;margin-right:6px}
+.dot.ok{background:var(--ok)}.dot.live{background:var(--live)}.dot.warn{background:var(--warn)}
+main{display:flex;flex-direction:column;min-width:0;min-height:0}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 22px 12px;flex-wrap:wrap}
+.top h1{margin:0;font-size:24px;font-weight:600}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{background:var(--panel);border:1px solid var(--line);border-radius:99px;padding:5px 12px;font-size:13px;color:var(--dim);white-space:nowrap}
+.chip.bad{color:var(--warn);border-color:#5a4426}
+.view{display:none;flex:1;min-height:0;padding:0 22px 20px;gap:16px}
+.view.cur{display:grid}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px;min-height:0;overflow:auto}
+.panel h2{margin:0 0 12px;font-size:15px;font-weight:600;color:var(--dim);text-transform:none}
+.note{color:var(--dim);font-size:13px;margin:6px 0 0}
+.warn{color:var(--warn)}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.note{color:var(--dim);font-size:14px;margin:8px 0 0}
-.warn{color:#ffb347;font-weight:600}
-button,a.b{font:600 15px Kanit,Tahoma,sans-serif;border:0;border-radius:10px;padding:9px 14px;cursor:pointer;color:#fff;background:#3a3f48;text-decoration:none}
-button:active{transform:translateY(1px)}button:disabled{opacity:.45;cursor:default}
-.go{background:var(--ok);color:#10140c}.blue{background:var(--blue)}.pur{background:var(--pur)}.red{background:var(--red)}.live-b{background:var(--live)}
-button.on{outline:3px solid var(--gold)}
-input[type=text],input[type=number]{font:600 16px Kanit,Tahoma,sans-serif;padding:9px 12px;border-radius:10px;border:1px solid var(--line);background:#0d0f13;color:var(--txt)}
-code{background:#0d0f13;color:var(--gold);padding:6px 10px;border-radius:8px;font-size:15px}
-.games{display:grid;gap:10px}
-.g{border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:grid;gap:6px;background:#191b21}
-.g.on{border-color:var(--live);box-shadow:0 0 0 2px rgba(229,86,107,.3)}
-.g h3{margin:0;font-size:19px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.tag{font-size:12px;padding:2px 9px;border-radius:99px;background:#2a2e37;color:var(--dim);font-weight:400}
-.tag.live{background:var(--live);color:#fff;font-weight:600}
-.g p{margin:0;color:#cfccc2;font-size:14px}.g .how{color:var(--gold);font-weight:600}
-.set{display:grid;grid-template-columns:minmax(150px,220px) 1fr;gap:10px 14px;align-items:center}
-.set label{color:var(--dim)}
-.set .sn{grid-column:2;color:var(--dim);font-size:13px;margin-top:-6px}
-@media(max-width:560px){.set{grid-template-columns:1fr}.set .sn{grid-column:1}}
-input[type=range]{width:min(100%,280px);accent-color:var(--gold)}
-.stat{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
-.stat div{background:#14161b;border-radius:10px;padding:8px 10px}
-.stat b{display:block;font-size:21px;color:var(--gold)}.stat span{font-size:13px;color:var(--dim)}
-.grp{color:var(--dim);font-size:14px;margin:12px 0 6px}
-#msg{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#0d0f13;border:1px solid var(--gold);padding:9px 16px;border-radius:12px;opacity:0;transition:.25s;pointer-events:none}
+/* ---------- ไลฟ์ ---------- */
+#v-live{grid-template-columns:minmax(220px,300px) 1fr minmax(260px,340px)}
+.hero{position:relative;border-radius:var(--r);overflow:hidden;background:#000 center/cover no-repeat;border:1px solid var(--line);min-height:0;display:flex;flex-direction:column;justify-content:flex-end}
+.hero::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(13,19,26,0) 40%,rgba(13,19,26,.92) 85%)}
+.hero>div{position:relative;z-index:1;padding:16px}
+.hero h3{margin:4px 0 4px;font-size:24px}.hero p{margin:0 0 12px;color:#c9d1d9;font-size:13px}
+.badge{display:inline-block;background:var(--live);color:#fff;font-size:12px;font-weight:600;padding:2px 10px;border-radius:99px}
+.mid{display:grid;grid-template-rows:auto 1fr;gap:16px;min-height:0}
+.stat{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.stat div{background:var(--panel2);border-radius:10px;padding:10px 12px}
+.stat b{display:block;font-size:24px;font-weight:600;color:#fff;line-height:1.2}.stat span{font-size:12px;color:var(--dim)}
+.grp{color:var(--dim);font-size:13px;margin:12px 0 6px}.grp:first-child{margin-top:0}
+/* ---------- คลังเกม ---------- */
+#v-lib{grid-template-columns:1fr minmax(280px,360px)}
+.shelf{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:16px;align-content:start}
+.cap{position:relative;aspect-ratio:9/16;border-radius:10px;overflow:hidden;cursor:pointer;background:#000 center/cover no-repeat;border:2px solid transparent;transition:transform .15s,border-color .15s,box-shadow .15s}
+.cap:hover{transform:translateY(-3px);box-shadow:0 10px 24px rgba(0,0,0,.5)}
+.cap.sel{border-color:var(--accent)}
+.cap::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0) 55%,rgba(0,0,0,.85))}
+.cap b{position:absolute;left:10px;right:10px;bottom:9px;z-index:1;font-size:16px;line-height:1.25}
+.cap .badge{position:absolute;top:8px;left:8px;z-index:1}
+.detail{display:flex;flex-direction:column;gap:10px}
+.detail .ban{aspect-ratio:16/10;border-radius:10px;background:#000 center 30%/cover no-repeat;flex:none}
+.detail h3{margin:0;font-size:24px}
+.tag{display:inline-block;font-size:12px;padding:2px 10px;border-radius:99px;background:#26364a;color:var(--dim)}
+.detail p{margin:0;color:#c9d1d9;font-size:14px}.detail .how{color:var(--gold);font-weight:600}
+/* ---------- ตั้งค่า ---------- */
+#v-set{grid-template-columns:1fr minmax(240px,320px)}
+.set{display:grid;grid-template-columns:minmax(150px,230px) 1fr;gap:12px 16px;align-items:center}
+.set label{color:#c9d1d9}
+.set .sn{grid-column:2;color:var(--dim);font-size:12px;margin-top:-8px}
+.compact .set{grid-template-columns:1fr;gap:6px}.compact .set .sn{display:none}.compact .set label{color:var(--dim);font-size:13px;margin-top:6px}
+.rv{min-width:44px;text-align:right;color:var(--dim)}
+/* ---------- ระบบ ---------- */
+#v-sys{grid-template-columns:repeat(2,minmax(0,1fr));align-content:start}
+code{background:#0b1118;color:var(--gold);padding:7px 11px;border-radius:8px;font-size:14px}
+ol{margin:6px 0 0;padding-left:20px;color:#c9d1d9}ol li{margin:3px 0}
+#msg{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#0b1118;border:1px solid var(--accent);padding:9px 18px;border-radius:10px;opacity:0;transition:.2s;pointer-events:none;z-index:9}
 #msg.show{opacity:1}
-</style></head><body><main>
-<header><h1>เปิดไลฟ์</h1><span class="pill" id="pill">กำลังโหลด</span></header>
+/* จอเล็ก: เมนูย้ายไปล่าง และเลื่อนหน้าได้ */
+@media (max-width:980px){
+  body{overflow:auto}.app{grid-template-columns:1fr;height:auto;min-height:100vh;padding-bottom:70px}
+  aside{position:fixed;bottom:0;left:0;right:0;flex-direction:row;padding:6px;z-index:5;border-right:0;border-top:1px solid var(--line)}
+  .brand,.conn{display:none}nav{display:flex;width:100%}nav button{flex-direction:column;gap:2px;font-size:12px;justify-content:center;padding:6px}
+  nav button.cur{box-shadow:inset 0 -3px 0 var(--accent)}
+  .view.cur{display:flex;flex-direction:column}.hero{min-height:360px}.stat{grid-template-columns:repeat(2,1fr)}
+  .set{grid-template-columns:1fr}.set .sn{grid-column:1}
+}
+</style></head><body>
+<div class="app">
+<aside>
+  <div class="brand"><i></i>จบค้าง <small>LIVE</small></div>
+  <nav>
+    <button data-view="live" class="cur"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M6.3 6.3a8 8 0 0 0 0 11.4M17.7 6.3a8 8 0 0 1 0 11.4M3.5 3.5a12 12 0 0 0 0 17M20.5 3.5a12 12 0 0 1 0 17"/></svg>ไลฟ์</button>
+    <button data-view="lib"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="9" rx="1.5"/><rect x="3" y="15" width="7" height="6" rx="1.5"/><rect x="14" y="15" width="7" height="6" rx="1.5"/></svg>คลังเกม</button>
+    <button data-view="set"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>ตั้งค่าเกม</button>
+    <button data-view="sys"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>ระบบ</button>
+  </nav>
+  <div class="conn"><b id="connT"><span class="dot"></span>กำลังโหลด</b><span id="connS"></span></div>
+</aside>
+<main>
+  <div class="top"><h1 id="title">ไลฟ์</h1><div class="chips" id="chips"></div></div>
 
-<section><h2><span class="n">1</span>บัญชี TikTok ที่จะไลฟ์</h2>
-<div class="row"><span>@</span><input type="text" id="acc" maxlength="30" style="width:220px" placeholder="jobkhang.th"><button id="accSave" class="blue">บันทึก</button></div>
-<p class="note" id="accNote"></p></section>
+  <section class="view cur" id="v-live">
+    <div class="hero" id="hero"><div><span class="badge">เกมบนจอไลฟ์</span><h3 id="heroT"></h3><p id="heroH"></p><button data-go="lib">เปลี่ยนเกม</button></div></div>
+    <div class="mid">
+      <div class="stat" id="stat"></div>
+      <div class="panel"><h2>ปุ่มสั่งเกม</h2><div id="actions"></div>
+        <div class="row" style="margin-top:14px"><button id="reload">โหลดหน้าเกมใหม่</button></div>
+        <p class="note">ปุ่มในหน้านี้คนดูไม่เห็น</p></div>
+    </div>
+    <div class="panel compact"><h2>ตั้งค่าด่วน</h2><div class="set" id="quick"></div><p class="note">ตั้งค่าครบพร้อมคำอธิบายอยู่ในหน้า ตั้งค่าเกม</p></div>
+  </section>
 
-<section><h2><span class="n">2</span>ลิงก์ใน LIVE Studio (ใส่ครั้งเดียว)</h2>
-<div class="row"><code id="link">http://127.0.0.1.nip.io:4192/</code><button id="copy">คัดลอก</button></div>
-<p class="note">เพิ่มแหล่งภาพแบบ Link ขนาด 1080 x 1920 แล้วคลิกขวาที่ภาพ > Interact > คลิกจอ 1 ครั้ง เพื่อเปิดเสียง</p>
-<p class="note" id="pageNote"></p></section>
+  <section class="view" id="v-lib">
+    <div class="panel"><div class="shelf" id="shelf"></div></div>
+    <div class="panel detail" id="detail"></div>
+  </section>
 
-<section><h2><span class="n">3</span>เลือกเกม</h2>
-<p class="note" style="margin:0 0 10px">กด "ใช้เกมนี้ไลฟ์" แล้วจอใน LIVE Studio เปลี่ยนเกมเองภายใน 5 วินาที ไม่ต้องแก้ลิงก์</p>
-<div class="games" id="games"></div></section>
+  <section class="view" id="v-set">
+    <div class="panel"><h2 id="setT">ตั้งค่า</h2><div class="set" id="settings"></div>
+      <p class="note">เปลี่ยนแล้วมีผลทันทีและจำไว้ เปิดเกมนี้ครั้งหน้าใช้ค่านี้ต่อ ค่าของแต่ละเกมแยกกัน</p></div>
+    <div class="panel"><h2>อื่นๆ</h2><div class="row"><button id="reset">คืนค่าเริ่มต้นของเกมนี้</button><a class="b" href="/sound-pick" target="_blank">เลือกเพลงและเสียง</a></div></div>
+  </section>
 
-<section id="setSec"><h2><span class="n">4</span>ตั้งค่า <span id="setTitle"></span></h2>
-<div class="set" id="settings"></div>
-<p class="note">เปลี่ยนแล้วมีผลทันทีและจำไว้ เปิดเกมครั้งหน้าใช้ค่านี้ต่อ</p>
-<div class="row" style="margin-top:10px"><button id="reset">คืนค่าเริ่มต้น</button><a class="b" href="/sound-pick" target="_blank">เลือกเพลงและเสียง</a></div></section>
-
-<section><h2><span class="n">5</span>ระหว่างไลฟ์</h2>
-<div class="stat" id="stat"></div>
-<div id="actions"></div>
-<div class="row" style="margin-top:14px"><button id="reload">โหลดหน้าเกมใหม่</button></div>
-<p class="note">ปุ่มพวกนี้คนดูไม่เห็น หน้านี้เปิดใน Chrome ไว้คู่กับ LIVE Studio</p></section>
-
-<p class="note" style="text-align:center">กด Go LIVE ใน LIVE Studio เอง หน้านี้ต่อไลฟ์ให้อัตโนมัติภายใน 30 วินาที</p>
-</main><div id="msg"></div>
+  <section class="view" id="v-sys">
+    <div class="panel"><h2>บัญชี TikTok ที่จะไลฟ์</h2><div class="row"><span>@</span><input type="text" id="acc" maxlength="30" style="flex:1;min-width:160px" placeholder="jobkhang.th"><button id="accSave" class="blue">บันทึก</button></div><p class="note" id="accNote"></p></div>
+    <div class="panel"><h2>ลิงก์ใน LIVE Studio (ใส่ครั้งเดียว)</h2><div class="row"><code id="link"></code><button id="copy">คัดลอก</button></div>
+      <ol><li>เพิ่มแหล่งภาพแบบ Link ขนาด 1080 x 1920</li><li>เปิด Turn on sound ของแหล่งนั้น</li><li>คลิกขวาที่ภาพ > Interact > คลิกจอ 1 ครั้ง เพื่อเปิดเสียง</li></ol></div>
+    <div class="panel"><h2>เปิดไลฟ์</h2><ol><li>เลือกเกมในหน้า คลังเกม</li><li>ตรวจป้ายด้านบนให้เป็นสีเขียวครบ</li><li>กด Go LIVE ใน LIVE Studio เอง หน้านี้ต่อไลฟ์ให้ภายใน 30 วินาที</li></ol></div>
+    <div class="panel"><h2>หลังจบไลฟ์</h2><ol><li>ปิดไลฟ์ใน LIVE Studio ก่อน</li><li>ค่อยปิดหน้าต่างดำของ start-live.cmd</li></ol></div>
+  </section>
+</main>
+</div><div id="msg"></div>
 <script>
-const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function toast(t){const m=$('msg');m.textContent=t;m.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>m.classList.remove('show'),1800)}
 const post=(u,b)=>fetch(u,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(b)});
-const LIVE={live:['กำลังไลฟ์','live'],offline:['ยังไม่ได้ไลฟ์',''],connecting:['กำลังต่อไลฟ์',''],error:['ต่อไลฟ์ไม่ได้ ลองใหม่เอง',''],demo:['โหมดจำลอง','ok']};
-let G=[],active='',cur={},shownSet='';
+const TITLES={live:'ไลฟ์',lib:'คลังเกม',set:'ตั้งค่าเกม',sys:'ระบบ'};
+const LIVE={live:['กำลังไลฟ์','live'],offline:['ยังไม่ได้ไลฟ์',''],connecting:['กำลังต่อไลฟ์','warn'],error:['ต่อไลฟ์ไม่ได้','warn'],demo:['โหมดจำลอง','ok']};
+const cover=id=>`url('/covers/${id}.jpg'), linear-gradient(160deg,#24384f,#0d131a)`;
+let G=[],active='',sel='',cur={},shown='',last=null;
+
+// ---------- สลับหน้า (จำหน้าล่าสุดไว้) ----------
+function go(v){if(!TITLES[v])v='live';document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('cur',b.dataset.view===v));document.querySelectorAll('.view').forEach(s=>s.classList.toggle('cur',s.id==='v-'+v));$('title').textContent=TITLES[v];try{localStorage.studioView=v}catch{}}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-view],[data-go]');if(b)go(b.dataset.view||b.dataset.go)});
+
+// ---------- บัญชี และลิงก์ ----------
 $('link').textContent=`http://127.0.0.1.nip.io:${location.port||4192}/`;
 $('copy').onclick=()=>navigator.clipboard.writeText($('link').textContent).then(()=>toast('คัดลอกลิงก์แล้ว'));
-
-async function loadAcc(){const d=await fetch('/config').then(r=>r.json());$('acc').value=d.account||'';if(!d.account&&!d.demo)$('accNote').innerHTML='<span class="warn">ยังไม่ได้ใส่ชื่อบัญชี ใส่แล้วกดบันทึก</span>'}
+async function loadAcc(){const d=await fetch('/config').then(r=>r.json());$('acc').value=d.account||'';if(!d.account&&!d.demo){$('accNote').innerHTML='<span class="warn">ยังไม่ได้ใส่ชื่อบัญชี ใส่แล้วกดบันทึก</span>';go('sys')}}
 $('accSave').onclick=async()=>{const v=$('acc').value.trim().replace(/^@/,'');if(!/^[\w.]{2,30}$/.test(v))return toast('ชื่อบัญชีใช้ได้แค่ a-z 0-9 _ .');const r=await post('/config',{account:v});toast(r.ok?'บันทึกแล้ว กำลังต่อบัญชีนี้':'บันทึกไม่ได้')};
 
-async function loadGames(){const d=await fetch('/games').then(r=>r.json());G=d.games.filter(g=>!g.hidden);active=d.active;
-  $('games').innerHTML=G.map(g=>{const on=g.id===active;return `<div class="g${on?' on':''}"><h3>${esc(g.title)}${on?'<span class="tag live">กำลังใช้ไลฟ์</span>':''}${g.status?`<span class="tag">${esc(g.status)}</span>`:''}</h3>
-    <p>${esc(g.desc)}</p><p class="how">${esc(g.how)}</p><div class="row">${on?'':`<button class="live-b" data-use="${g.id}">ใช้เกมนี้ไลฟ์</button>`}
-    <a class="b" href="/play/${g.id}${g.test?'?test=1':''}" target="_blank">${g.test?'ลองเล่น (มีปุ่มจำลองคนดู)':'เปิดดู'}</a></div></div>`}).join('');
-  await loadSettings()}
-document.addEventListener('click',async e=>{const u=e.target.closest('[data-use]');if(!u)return;await post('/active',{id:u.dataset.use});toast('เปลี่ยนเกมแล้ว จอไลฟ์จะเปลี่ยนใน 5 วินาที');loadGames()});
+// ---------- คลังเกม ----------
+const game=id=>G.find(g=>g.id===(id||active))||{};
+async function loadGames(){const d=await fetch('/games').then(r=>r.json());G=d.games.filter(g=>!g.hidden);active=d.active;if(!sel||!G.some(g=>g.id===sel))sel=active;
+  $('shelf').innerHTML=G.map(g=>`<div class="cap${g.id===sel?' sel':''}" data-sel="${g.id}" style="background-image:${cover(g.id)}">${g.id===active?'<span class="badge">LIVE</span>':''}<b>${esc(g.title)}</b></div>`).join('');
+  renderDetail();renderHero();await loadSettings()}
+function renderDetail(){const g=game(sel),on=g.id===active;
+  $('detail').innerHTML=`<div class="ban" style="background-image:${cover(g.id)}"></div><h3>${esc(g.title)}</h3><div class="row">${on?'<span class="badge">กำลังใช้ไลฟ์</span>':''}${g.status?`<span class="tag">${esc(g.status)}</span>`:''}</div>
+    <p>${esc(g.desc)}</p><p class="how">${esc(g.how)}</p>
+    <div class="row" style="margin-top:auto">${on?'<button class="play" data-go="live">ไปหน้าไลฟ์</button>':`<button class="play" data-use="${g.id}">ไลฟ์เกมนี้</button>`}
+    <a class="b" href="/play/${g.id}${g.test?'?test=1':''}" target="_blank">${g.test?'ลองเล่น':'เปิดดู'}</a></div>
+    ${g.test?'<p class="note">ลองเล่นมีปุ่มจำลองคนดูด้านล่างจอ ไม่กระทบไลฟ์</p>':''}`}
+function renderHero(){const g=game();$('hero').style.backgroundImage=cover(g.id);$('heroT').textContent=g.title||'';$('heroH').textContent=g.how||''}
+document.addEventListener('click',async e=>{const c=e.target.closest('[data-sel]');if(c){sel=c.dataset.sel;document.querySelectorAll('.cap').forEach(x=>x.classList.toggle('sel',x===c));renderDetail();return}
+  const u=e.target.closest('[data-use]');if(u){await post('/active',{id:u.dataset.use});toast('เปลี่ยนเกมแล้ว จอไลฟ์จะเปลี่ยนใน 5 วินาที');await loadGames()}});
 
-const game=()=>G.find(g=>g.id===active)||{};
-async function loadSettings(){const g=game(),p=g.panel||{};$('setTitle').textContent=g.title||'';
+// ---------- ตั้งค่า (หน้าเต็มกับตั้งค่าด่วนใช้ตัววาดเดียวกัน) ----------
+function setsHTML(sets){return sets.length?sets.map(s=>{const v=s.key in cur?cur[s.key]:s.default;let h='';
+  if(s.type==='choice')h=`<div class="row">${s.options.map(([o,l])=>`<button data-set="${s.key}" data-v="${esc(JSON.stringify(o))}" class="${o===v?'on':''}">${esc(l)}</button>`).join('')}</div>`;
+  else if(s.type==='toggle')h=`<div class="row"><button data-set="${s.key}" data-v="1" class="${+v?'on':''}">เปิด</button><button data-set="${s.key}" data-v="0" class="${+v?'':'on'}">ปิด</button></div>`;
+  else if(s.type==='range')h=`<div class="row" style="flex-wrap:nowrap"><input type="range" data-range="${s.key}" min="${s.min}" max="${s.max}" step="${s.step}" value="${v}"><span class="rv" data-rv="${s.key}">${Math.round(v*100)}%</span></div>`;
+  return `<label>${esc(s.label)}</label>${h}${s.note?`<div class="sn">${esc(s.note)}</div>`:''}`}).join(''):'<p class="note" style="grid-column:1/-1;margin:0">เกมนี้ยังไม่มีค่าให้ตั้ง</p>'}
+async function loadSettings(){const g=game(),p=g.panel||{},sets=p.settings||[];
   cur=await fetch('/settings/'+active).then(r=>r.json()).catch(()=>({}));
-  const sets=p.settings||[];
-  $('settings').innerHTML=sets.length?sets.map(s=>{const v=s.key in cur?cur[s.key]:s.default;let h='';
-    if(s.type==='choice')h=`<div class="row">${s.options.map(([o,l])=>`<button data-set="${s.key}" data-v='${esc(JSON.stringify(o))}' class="${o===v?'on':''}">${esc(l)}</button>`).join('')}</div>`;
-    else if(s.type==='toggle')h=`<div class="row"><button data-set="${s.key}" data-v="1" class="${+v?'on':''}">เปิด</button><button data-set="${s.key}" data-v="0" class="${+v?'':'on'}">ปิด</button></div>`;
-    else if(s.type==='range')h=`<div class="row"><input type="range" data-range="${s.key}" min="${s.min}" max="${s.max}" step="${s.step}" value="${v}"><span id="rv_${s.key}">${Math.round(v*100)}%</span></div>`;
-    return `<label>${esc(s.label)}</label>${h}${s.note?`<div class="sn">${esc(s.note)}</div>`:''}`}).join(''):'<p class="note" style="grid-column:1/-1;margin:0">เกมนี้ยังไม่มีค่าให้ตั้ง</p>';
-  $('reset').style.display=sets.length?'':'none';
-  const acts=p.actions||[];let last=null;
-  $('actions').innerHTML=acts.length?acts.map((a,i)=>{let h='';if(i===0||a.group!==last){h+=(i?'</div>':'')+(a.group?`<div class="grp">${esc(a.group)}</div>`:'<div class="grp">ปุ่มสั่งเกม</div>')+'<div class="row">';last=a.group}
-    if(a.input)h+=`<input type="${a.input==='number'?'number':'text'}" id="in${i}" ${a.input==='number'?'min="1" value="1" style="width:90px"':'maxlength="140" style="width:min(100%,420px)"'} placeholder="${esc(a.placeholder||'')}">`;
-    return h+`<button class="${a.style||''}" data-act="${i}">${esc(a.label)}</button>`}).join('')+'</div>':'';
-  shownSet=active}
+  $('setT').textContent='ตั้งค่า '+(g.title||'');$('settings').innerHTML=setsHTML(sets);$('quick').innerHTML=setsHTML(sets);$('reset').disabled=!sets.length;
+  const acts=p.actions||[];let grp;
+  $('actions').innerHTML=acts.length?acts.map((a,i)=>{let h='';if(i===0||a.group!==grp){h+=(i?'</div>':'')+`<div class="grp">${esc(a.group||'ทั่วไป')}</div><div class="row">`;grp=a.group}
+    if(a.input)h+=`<input type="${a.input==='number'?'number':'text'}" id="in${i}" ${a.input==='number'?'min="1" value="1" style="width:84px"':'maxlength="140" style="flex:1;min-width:200px"'} placeholder="${esc(a.placeholder||'')}">`;
+    return h+`<button class="${a.style||''}" data-act="${i}">${esc(a.label)}</button>`}).join('')+'</div>':'<p class="note">เกมนี้ยังไม่มีปุ่มสั่ง</p>';
+  shown=active}
 async function setVal(k,v){cur[k]=v;const r=await post('/settings/'+active,{[k]:v});toast(r.ok?'ตั้งค่าแล้ว':'ตั้งค่าไม่ได้')}
-document.addEventListener('click',e=>{const b=e.target.closest('[data-set]');if(!b)return;setVal(b.dataset.set,JSON.parse(b.dataset.v));b.parentElement.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b))});
-document.addEventListener('input',e=>{const k=e.target.dataset.range;if(k)$('rv_'+k).textContent=Math.round(e.target.value*100)+'%'});
+function mark(k,v){document.querySelectorAll(`[data-set="${k}"]`).forEach(x=>x.classList.toggle('on',JSON.stringify(JSON.parse(x.dataset.v))===JSON.stringify(v)));document.querySelectorAll(`[data-range="${k}"]`).forEach(x=>x.value=v);document.querySelectorAll(`[data-rv="${k}"]`).forEach(x=>x.textContent=Math.round(v*100)+'%')}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-set]');if(!b)return;const v=JSON.parse(b.dataset.v);mark(b.dataset.set,v);setVal(b.dataset.set,v)});
+document.addEventListener('input',e=>{const k=e.target.dataset.range;if(k)mark(k,+e.target.value)});
 document.addEventListener('change',e=>{const k=e.target.dataset.range;if(k)setVal(k,+e.target.value)});
 $('reset').onclick=async()=>{const d={};for(const s of game().panel?.settings||[])d[s.key]=s.default;await post('/settings/'+active,d);toast('คืนค่าเริ่มต้นแล้ว');loadSettings()};
 document.addEventListener('click',async e=>{const b=e.target.closest('[data-act]');if(!b)return;const i=+b.dataset.act,a=game().panel.actions[i];let arg=a.arg??null;
   if(a.input){const el=$('in'+i);arg=a.input==='number'?Math.max(1,+el.value||1):el.value.trim();if(!arg)return toast('พิมพ์ข้อความก่อน')}
   if(a.confirm&&!confirm(a.label+' ใช่ไหม'))return;
   const r=await post('/control',{cmd:a.cmd,arg});toast(r.ok?'ส่งคำสั่งแล้ว':'ส่งไม่ได้');if(r.ok&&a.input==='text')$('in'+i).value=''});
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id?.startsWith('in'))document.querySelector(`[data-act="${e.target.id.slice(2)}"]`)?.click()});
 $('reload').onclick=()=>post('/control',{cmd:'reload'}).then(()=>toast('สั่งโหลดหน้าเกมใหม่แล้ว'));
 
-async function poll(){const d=await fetch('/state').then(r=>r.json()).catch(()=>null);
-  if(!d){$('pill').textContent='server ปิดอยู่';$('pill').className='pill';$('pageNote').innerHTML='<span class="warn">ติดต่อ server ไม่ได้ เปิดไฟล์ start-live.cmd ใหม่</span>';return}
-  const L=LIVE[d.live.state]||[d.live.state,''];$('pill').textContent=L[0]+(d.live.state==='live'?` คนดู ${d.live.viewers}`:'');$('pill').className='pill '+L[1];
+// ---------- สถานะ ทุก 1 วินาที ----------
+async function poll(){const d=await fetch('/state').then(r=>r.json()).catch(()=>null),chip=(ok,t)=>`<span class="chip${ok?'':' bad'}"><span class="dot ${ok?'ok':'warn'}"></span>${t}</span>`;
+  if(!d){$('chips').innerHTML=chip(0,'server ปิดอยู่ เปิด start-live.cmd ใหม่');$('connT').innerHTML='<span class="dot warn"></span>server ปิดอยู่';$('connS').textContent='';return}
+  const L=LIVE[d.live.state]||[d.live.state,''],s=d.state,g=game(),p=g.panel||{};
+  $('connT').innerHTML=`<span class="dot ${L[1]}"></span>${L[0]}`;$('connS').textContent=(d.live.user?'@'+d.live.user:'ยังไม่ได้ตั้งบัญชี')+(d.live.state==='live'?` · คนดู ${d.live.viewers}`:'');
   if(d.live.user)$('accNote').textContent=`ตัวเชื่อมใช้บัญชี @${d.live.user} : ${L[0]}`;
-  const s=d.state,g=game(),p=g.panel||{};
-  if(!s)$('pageNote').innerHTML='<span class="warn">ยังไม่เจอหน้าเกม: เปิด LIVE Studio แล้วคลิกขวาที่แหล่ง Link > Refresh</span>';
-  else{const onScreen=(G.find(x=>x.id===s.game)||{}).title||s.game;$('pageNote').innerHTML=`หน้าเกมเปิดอยู่: <b>${esc(onScreen)}</b>`+(s.audio==='suspended'?' <span class="warn">เสียงถูกพัก คลิกขวา > Interact > คลิกจอ</span>':'')}
-  if(active&&shownSet!==active)loadSettings();
-  $('stat').innerHTML=s&&p.state?p.state.filter(([k])=>k in s).map(([k,l,m])=>`<div><b>${esc(m?(m[s[k]]??s[k]):s[k])}</b><span>${esc(l)}</span></div>`).join(''):'';
-  if(s&&s.game==='lantern'&&g.id==='lantern')document.querySelectorAll('[data-set="npc"]').forEach(b=>b.classList.toggle('on',JSON.parse(b.dataset.v)===s.npc))}
+  const wrong=s&&s.game!==active&&G.some(x=>x.id===s.game);
+  $('chips').innerHTML=chip(1,'server')+chip(!!s,s?(wrong?'หน้าเกมกำลังเปลี่ยน':'หน้าเกมใน LIVE Studio'):'ไม่เจอหน้าเกม: Refresh แหล่ง Link')+chip(s&&s.audio!=='suspended',s&&s.audio==='suspended'?'เสียงถูกพัก: Interact แล้วคลิกจอ':'เสียง')+chip(d.live.state==='live'||d.live.state==='demo',d.live.state==='live'?`TikTok ไลฟ์อยู่ · คนดู ${d.live.viewers}`:'TikTok: '+L[0]);
+  if(active&&shown!==active)loadSettings();
+  $('stat').innerHTML=s&&!wrong&&p.state?p.state.filter(([k])=>k in s).map(([k,l,m])=>`<div><b>${esc(m?(m[s[k]]??s[k]):Number.isFinite(s[k])?s[k].toLocaleString():s[k])}</b><span>${esc(l)}</span></div>`).join(''):'<div style="grid-column:1/-1"><b>-</b><span>ยังไม่มีข้อมูลจากหน้าเกม</span></div>';
+  // ค่าที่เกมรายงานกลับ (เช่น ชาวงานเปลี่ยนจากที่อื่น) ให้ปุ่มตรงกับของจริง
+  if(s&&!wrong)for(const st of p.settings||[])if(st.key in s&&s[st.key]!==cur[st.key]&&typeof s[st.key]!=='object'){cur[st.key]=s[st.key];mark(st.key,s[st.key])}}
+
+try{go(localStorage.studioView)}catch{go('live')}
 loadAcc();loadGames();poll();setInterval(poll,1000);setInterval(()=>fetch('/games').then(r=>r.json()).then(d=>{if(d.active!==active)loadGames()}).catch(()=>{}),4000);
 </script></body></html>

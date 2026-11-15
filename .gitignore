@@ -26,3 +26,5 @@ active-game.json
 record-*.json
 config.json
 settings/
+# ปกเกมในหน้า /studio ถ่ายจากหน้าเกมจริง
+!covers/*.jpg
