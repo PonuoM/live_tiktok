@@ -79,6 +79,9 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200, { 'content-type': m[2] === 'png' ? 'image/png' : 'application/json', 'cache-control': 'no-store' });
     return fs.createReadStream(path.join(GIFT_DIR, m[1])).pipe(res);
   }
+  // three.js เก็บในเครื่อง (vendor/) ไม่ต้องโหลดจากเว็บ และไม่พึ่ง importmap ที่ LIVE Studio บางรุ่นไม่รองรับ
+  const vm = url.pathname.match(/^\/vendor\/three\/([\w\/.-]+\.js)$/);
+  if (vm && !vm[1].includes('..')) { const f = path.join(DIR, 'vendor', 'three', vm[1]); if (fs.existsSync(f)) { res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'max-age=86400' }); return fs.createReadStream(f).pipe(res); } }
   if (url.pathname === '/favicon.ico') { res.writeHead(204); return res.end(); }
   res.writeHead(404); res.end();
 });

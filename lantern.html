@@ -8,20 +8,19 @@ html,body{margin:0;background:#000;height:100%;overflow:hidden;display:flex;alig
 #wrap canvas{position:absolute;inset:0;width:100%;height:100%}
 #ui{pointer-events:none}
 </style>
-<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
 </head><body><div id="wrap"><canvas id="gl"></canvas><canvas id="ui" width="1080" height="1920"></canvas></div>
 <script type="module">
 // ===== โคมขอพร: พิมพ์คำอธิษฐาน = ปล่อยโคมที่มีรูปโปรไฟล์และชื่อของตัวเองลอยขึ้นฟ้า กดหัวใจ = โคมสว่างและลอยเร็วขึ้น =====
 // ไม่มีแพ้ ไม่มีกติกาให้จำ ฉากสามมิติด้วย three.js (โหลดจาก jsDelivr ต้องต่ออินเทอร์เน็ต)
 // ของขวัญเป็นของตกแต่ง (โคมพิเศษ พลุ) ไม่ผูกกับบุญหรือผลทางศาสนา ไม่มีพระหรือพระพุทธรูปในฉาก
 // ?demo=1 คนดูจำลอง  ?test=1 เล่นเองด้วยปุ่ม  ?safe=1 ระบายส่วนที่ UI ของ TikTok บัง
-import * as THREE from 'three';
-import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';
-import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
-import {UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';
-import {OutputPass} from 'three/addons/postprocessing/OutputPass.js';
-import {Reflector} from 'three/addons/objects/Reflector.js';
-import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
+import * as THREE from '/vendor/three/build/three.module.js';
+import {EffectComposer} from '/vendor/three/examples/jsm/postprocessing/EffectComposer.js';
+import {RenderPass} from '/vendor/three/examples/jsm/postprocessing/RenderPass.js';
+import {UnrealBloomPass} from '/vendor/three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import {OutputPass} from '/vendor/three/examples/jsm/postprocessing/OutputPass.js';
+import {Reflector} from '/vendor/three/examples/jsm/objects/Reflector.js';
+import {mergeGeometries} from '/vendor/three/examples/jsm/utils/BufferGeometryUtils.js';
 
 const Q=new URLSearchParams(location.search),DEMO=Q.has('demo')||Q.has('test')||Q.has('model'),SHOWSAFE=Q.has('safe');
 const W=1080,H=1920,FONT='Kanit, Tahoma, sans-serif',SAFE_T=72,SAFE_B=1390,IDLE=25;
