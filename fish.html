@@ -462,7 +462,7 @@ function mcClick(){const c=SND.ctx,t0=c.currentTime,s=c.createBufferSource(),gn=
 // ประกาศสำคัญเปิดด้วยเสียงหวอสั้นๆ จากปุ่มไซเรนของโทรโข่ง (เสียงขึ้นสองรอบ)
 function mcChime(){const c=SND.ctx,t0=c.currentTime,o=c.createOscillator(),gn=c.createGain();o.type='square';
   o.frequency.setValueAtTime(650,t0);o.frequency.linearRampToValueAtTime(1150,t0+0.28);o.frequency.setValueAtTime(650,t0+0.3);o.frequency.linearRampToValueAtTime(1150,t0+0.58);
-  gn.gain.setValueAtTime(0.0001,t0);gn.gain.exponentialRampToValueAtTime(0.16,t0+0.03);gn.gain.setValueAtTime(0.16,t0+0.52);gn.gain.exponentialRampToValueAtTime(0.0001,t0+0.66);
+  gn.gain.setValueAtTime(0.0001,t0);gn.gain.exponentialRampToValueAtTime(0.05,t0+0.03);gn.gain.setValueAtTime(0.05,t0+0.52);gn.gain.exponentialRampToValueAtTime(0.0001,t0+0.66);
   o.connect(gn).connect(mcPA());o.start(t0);o.stop(t0+0.7);return new Promise(r=>setTimeout(r,800))}
 function mcSay(t,o={}){if(PRESIM||(!CFG.mc&&!o.pri))return;if(o.n!=null&&!clean(o.n))return;const q=MC.q;if(q.length>=10){const i=q.findIndex(x=>!x.pri);if(i<0)return;q.splice(i,1)}
   const it={t,n:o.n,f:o.f,pri:o.pri||0,chime:o.chime,w:o.w,at:performance.now()/1000,ttl:o.ttl||30};if(it.pri){const i=q.findIndex(x=>!x.pri);q.splice(i<0?q.length:i,0,it)}else q.push(it);if(!MC.busy)mcNext()}
