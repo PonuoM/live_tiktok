@@ -319,7 +319,7 @@ function caught(F,c){const p=F.p;stats.catches++;if(c.r===3)stats.legends++;cons
 function afterCatchSay(p,c){if(p.npc)return;
   if(c.r===3){sfx('flegfan',1);sfxAt('clapb',0.8,1.4,2);duck(5.5);mcSay('ปลาตำนาน! คุณ{n}ได้'+c.f.n+' หนัก '+c.kg+' กิโลครับ ขอเสียงปรบมือหน่อยครับ',{n:p.name,f:'มีคนได้ปลาตำนานแล้วครับ ขอเสียงปรบมือหน่อยครับ',pri:1,chime:1,ttl:30})}
   else if(c.r===2){sfxAt('frare',0.95,0,0.5);sfxAt('claps',0.6,0.7,2);duck(2.5);mcSay('โอ้โห คุณ{n}ได้'+c.f.n+'ตัวใหญ่ หนัก '+c.kg+' กิโลครับ',{n:p.name,f:'มีคนได้ปลาหายากแล้วครับ',ttl:18})}
-  else{sfx('fcatch',c.r?0.7:0.45);if(p.casts===1)mcSay(pick(['คุณ{n}ได้ปลาตัวแรกแล้วครับ พิมพ์อีกได้เรื่อยๆ นะครับ','ยินดีด้วยครับคุณ{n} ตัวแรกมาแล้ว พิมพ์อีกเพื่อลุ้นตัวใหญ่ครับ']),{n:p.name,f:'มีคนได้ปลาตัวแรกแล้วครับ',ttl:15})}}
+  else{sfx('fcatch',c.r?0.7:0.45);if(p.casts===1)mcSay(pick(['คุณ{n}ได้ปลาตัวแรกแล้วครับ กดหัวใจรัวๆ ตกต่อได้เรื่อยๆ นะครับ','ยินดีด้วยครับคุณ{n} ตัวแรกมาแล้ว กดหัวใจต่อเพื่อลุ้นตัวใหญ่ครับ']),{n:p.name,f:'มีคนได้ปลาตัวแรกแล้วครับ',ttl:15})}}
 function banner(s,col,sub=''){banners.push({s,col,sub,t:Math.max(NOW,...banners.map(b=>b.t+2.6))})}
 
 // ---------- ปลาตำนานโผล่ (ทุก CFG.legend นาที): ใครพิมพ์ในช่วงนับถอยหลังได้ลุ้น ----------
@@ -368,6 +368,8 @@ function comment(name,text,pic){const p=player(name,pic);lastReal=NOW;const t=St
 let helpT=-99,helpShow=-99;
 let heartFx=[];
 function like(name,n,pic){const p=player(name,pic);p.hearts+=n;liveHearts+=n;if(p.F&&heartFx.filter(h=>h.F===p.F).length<8)for(let i=0;i<Math.min(4,n);i++)heartFx.push({F:p.F,t:NOW+i*0.08,dx:rnd(-30,30),c:pick(['#ff5a7a','#ff8aa8','#ff3a6a'])});if(!p.F&&p.hearts>=5&&NOW-(p.autoT||-99)>20){p.autoT=NOW;cast(p);welcomeFirst(p)}
+  // นั่งบนท่าแล้ว กดหัวใจ = เหวี่ยงเบ็ดต่อ ไม่ต้องพิมพ์ซ้ำ (ผู้ใช้สั่ง 15 พ.ย. 2026) คิวเบ็ดเต็มที่ 2 กดรัวแค่ไหนก็ไม่ล้น
+  else if(p.F&&fishers.includes(p.F)&&!p.npc)cast(p);
   while(liveHearts>=MS_G(msIdx)){heartGoal(MS_G(msIdx));msIdx++}}
 const GIMG={};
 function giftImg(id,url){if(!id)return null;if(GIMG[id])return GIMG[id];const im=new Image();im.referrerPolicy='no-referrer';im.onerror=()=>{if(url&&im.src!==url)im.src=url};im.src=`/gifts/${id}.png`;return GIMG[id]=im}
@@ -442,7 +444,7 @@ function musicTick(){const c=SND.ctx,b=SND.buf.bgm_fish;if(!c||c.state!=='runnin
 // ---------- โฆษกท่าน้ำ (เสียงเดียวกับโคม สร้างที่ server /mc) ----------
 const MC={q:[],busy:false,lastEnd:-99,idleT:8,recent:[],pa:null,n:0};
 const MC_IDLE=['พิมพ์อะไรก็ได้ในแชทครับ ตัวละครชื่อคุณจะนั่งตกปลาให้ทันที','ใครยังไม่ได้ตก พิมพ์มาสักคำครับ จะพิมพ์ว่าตกปลา หรือพิมพ์ชื่อตัวเองก็ได้',
-  'กดหัวใจรัวๆ ปลาจะกินเบ็ดเร็วขึ้นนะครับ','พิมพ์ได้เรื่อยๆ นะครับ พิมพ์หนึ่งครั้งได้เหวี่ยงเบ็ดหนึ่งครั้ง ลุ้นตัวใหญ่กว่าเดิม','ปลาที่ตกได้อยู่ในถังน้ำข้างตัวนะครับ ลุกจากท่าเมื่อไหร่ เราปล่อยคืนบึงทุกตัวครับ',
+  'กดหัวใจรัวๆ ปลาจะกินเบ็ดเร็วขึ้นนะครับ','พิมพ์ครั้งเดียวได้นั่งท่าน้ำ จากนั้นกดหัวใจรัวๆ ได้เหวี่ยงเบ็ดต่อเรื่อยๆ ไม่ต้องพิมพ์ซ้ำครับ','ปลาที่ตกได้อยู่ในถังน้ำข้างตัวนะครับ ลุกจากท่าเมื่อไหร่ เราปล่อยคืนบึงทุกตัวครับ',
   'ใครได้ปลาตัวใหญ่สุด ขึ้นกระดานด้านซ้ายมือเลยครับ','หัวใจรวมครบเป้าเมื่อไหร่ ปลาจะขึ้นฝูง กินเบ็ดไวมากครับ','อีกไม่นานปลาตำนานจะโผล่ ตอนนั้นใครพิมพ์ทันได้ลุ้นครับ',
   'ชอบบรรยากาศริมบึงแบบนี้ กดติดตามไว้ได้เลยนะครับ จะได้ไม่พลาดไลฟ์หน้า','ขอบคุณทุกคนที่แวะมานั่งตกปลาด้วยกันนะครับ','ลมเย็นสบาย น้ำนิ่ง วันนี้ปลาน่าจะกินเบ็ดดีครับ'];
 const MC_WELCOME=['ยินดีต้อนรับคุณ{n}ครับ พิมพ์อะไรก็ได้เพื่อตกปลาเลยครับ','สวัสดีครับคุณ{n} พิมพ์มาสักคำ แล้วมานั่งตกปลาด้วยกันครับ','คุณ{n}มาแล้วครับ พิมพ์อะไรก็ได้ในแชท เพื่อเริ่มตกปลาครับ'];
@@ -556,7 +558,7 @@ function hud(){const d=DAY.cur;
   panel(16,SAFE_T,1048,186,'#ffcf8a',0.6);
   txt('ตกปลาริมบึง',60,SAFE_T+40,26,'#ffcf8a','left',700);txt(`${d.n||''}${frenzyOn()?'  ·  ปลาขึ้นฝูง!':''}`,1020,SAFE_T+40,24,frenzyOn()?'#ffd04a':'#e8d8ff','right',600);
   const pulse=1+0.04*Math.sin(NOW*4);g.save();g.translate(540,SAFE_T+92);g.scale(pulse,pulse);txt('พิมพ์อะไรก็ได้ = ตกปลา',0,0,52,'#ffffff','center',700);g.restore();
-  heart(232,SAFE_T+134,28);txt('กดหัวใจ = ปลากินเบ็ดเร็วขึ้น',540,SAFE_T+146,32,'#ffc0d0','center',700);
+  heart(232,SAFE_T+134,28);txt('กดหัวใจ = ตกต่อเรื่อยๆ ปลากินเร็วขึ้น',540,SAFE_T+146,32,'#ffc0d0','center',700);
   txt('ปลาลงถังน้ำ ลุกจากท่าเมื่อไหร่ปล่อยคืนบึงทุกตัว',540,SAFE_T+176,20,'#c8e8d0','center',500);
   const y=SAFE_T+196,g0=msIdx?MS_G(msIdx-1):0,g1=MS_G(msIdx),k=clamp((liveHearts-g0)/(g1-g0),0,1);
   const near=k>=0.8,hp=near?1+0.25*Math.abs(Math.sin(NOW*6)):1;panel(16,y,1048,50,near?'#ff4a78':'#ff8aa8',near?0.75:0.55);heart(46,y+26,24*hp);txt(near?`อีก ${(g1-liveHearts).toLocaleString()} หัวใจ ครบแล้วอลังการ!`:`หัวใจรวม ${liveHearts.toLocaleString()} / ${g1.toLocaleString()}  ครบแล้วทุกคนได้เหยื่อพิเศษ`,72,y+22,20,near?'#ffe066':'#fff','left',700);
