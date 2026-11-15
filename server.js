@@ -76,7 +76,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "POST") {
       let body = ""; for await (const ch of req) { body += ch; if (body.length > 200) break; }
       const best = Math.floor(+(JSON.parse(body || "{}").best) || 0);
-      if (best > (rec.best || 0) && best < 100000) { rec = { best, date: new Date().toISOString() }; fs.writeFileSync(f, JSON.stringify(rec)); }
+      if (best > (rec.best || 0) && best < 100000000) { rec = { best, date: new Date().toISOString() }; fs.writeFileSync(f, JSON.stringify(rec)); }
     }
     res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
     return res.end(JSON.stringify(rec));
@@ -104,8 +104,9 @@ const server = http.createServer(async (req, res) => {
   const vm = url.pathname.match(/^\/vendor\/three\/([\w\/.-]+\.js)$/);
   if (vm && !vm[1].includes('..')) { const f = path.join(DIR, 'vendor', 'three', vm[1]); if (fs.existsSync(f)) { res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'max-age=86400' }); return fs.createReadStream(f).pipe(res); } }
   // ภาพปลาของเกมตกปลา (art/fish/<id>.png ตัดพื้นแล้ว)
-  const am = url.pathname.match(/^\/art\/fish\/([a-z_]+)\.png$/);
-  if (am) { const f = path.join(DIR, 'art', 'fish', am[1] + '.png'); if (fs.existsSync(f)) { res.writeHead(200, { 'content-type': 'image/png', 'cache-control': 'max-age=3600' }); return fs.createReadStream(f).pipe(res); } }
+  // และภาพเกมจุดเทียนไล่ผี (art/ghost/<id>.png หรือ .jpg)
+  const am = url.pathname.match(/^\/art\/(fish|ghost|temple)\/([a-z0-9_]+)\.(png|jpg)$/);
+  if (am) { const f = path.join(DIR, 'art', am[1], am[2] + '.' + am[3]); if (fs.existsSync(f)) { res.writeHead(200, { 'content-type': am[3] === 'jpg' ? 'image/jpeg' : 'image/png', 'cache-control': 'max-age=3600' }); return fs.createReadStream(f).pipe(res); } }
   // ปกเกมในหน้า /studio (ถ่ายจากหน้าเกมจริง ไฟล์ covers/<id>.jpg)
   const cm = url.pathname.match(/^\/covers\/([a-z]+)\.jpg$/);
   if (cm) { const f = path.join(DIR, 'covers', cm[1] + '.jpg'); if (fs.existsSync(f)) { res.writeHead(200, { 'content-type': 'image/jpeg', 'cache-control': 'no-cache' }); return fs.createReadStream(f).pipe(res); } }

@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="th"><head><meta charset="utf-8"><title>ghost concept</title>
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@500;600;700&display=swap" rel="stylesheet">
+<style>html,body{margin:0;background:#000}canvas{display:block}</style></head><body>
+<canvas id="c" width="1080" height="1920"></canvas>
+<script>
+// ภาพคอนเซปต์เกมจุดเทียนไล่ผี: ภาพฉากจาก Codex + ป้ายบนจอที่จะมีในเกมจริง  ?f=bright | dark
+const F=new URLSearchParams(location.search).get('f')||'bright',W=1080,H=1920,FONT='Kanit';
+const c=document.getElementById('c'),g=c.getContext('2d');
+const X=x=>x*1.25-100,Y=y=>y*1.25;   // พิกัดภาพ 1024x1536 -> จอ 1080x1920 (ตัดขอบซ้ายขวา)
+function txt(s,x,y,size,col='#fff',al='left',w=700,st='rgba(10,6,4,.9)'){g.font=`${w} ${size}px ${FONT}`;g.textAlign=al;g.lineJoin='round';g.lineWidth=Math.max(5,size/4.5);g.strokeStyle=st;g.strokeText(s,x,y);g.fillStyle=col;g.fillText(s,x,y)}
+function panel(x,y,w,h,bc,a=0.7,fill='20,12,10'){g.beginPath();g.roundRect(x,y,w,h,22);g.fillStyle=`rgba(${fill},${a})`;g.fill();g.lineWidth=2.5;g.strokeStyle=bc;g.stroke()}
+function heart(x,y,s,col='#ff5a7a'){g.fillStyle=col;g.beginPath();g.moveTo(x,y+s*0.35);g.bezierCurveTo(x-s*0.9,y-s*0.25,x-s*0.35,y-s*0.85,x,y-s*0.35);g.bezierCurveTo(x+s*0.35,y-s*0.85,x+s*0.9,y-s*0.25,x,y+s*0.35);g.fill()}
+const COL=['#a85a4a','#4a6a8a','#8a7a4a','#6a4a7a','#4a7a6a','#9a6a3a'];
+function av(name,x,y,r,ring){g.beginPath();g.arc(x,y,r+3,0,7);g.fillStyle=ring;g.fill();g.beginPath();g.arc(x,y,r,0,7);g.fillStyle=COL[name.length%6];g.fill();g.font=`700 ${r}px ${FONT}`;g.textAlign='center';g.fillStyle='#fff';g.fillText(name[0].toUpperCase(),x,y+r*0.36)}
+// ป้ายเหนือเทียน: lit = ติดอยู่, off = ยังไม่ติด/ดับ, gold = ผู้พิทักษ์
+function tag(name,ix,iy,st,sc=1){const x=X(ix),y=Y(iy)-70*sc;const ring=st==='gold'?'#ffd04a':st==='lit'?'#ffb070':'#8a8a92';
+  g.globalAlpha=st==='off'?0.85:1;av(name,x,y-20*sc,20*sc,ring);txt(name,x,y+14*sc,20*sc,st==='gold'?'#ffe066':st==='lit'?'#ffe9c8':'#c8c8d0','center',700);g.globalAlpha=1}
+function callout(lines,x,y,bc,tx,ty){if(tx!=null){g.strokeStyle=bc;g.lineWidth=4;g.setLineDash([10,8]);g.beginPath();g.moveTo(x,y);g.lineTo(tx,ty);g.stroke();g.setLineDash([])}
+  g.font=`700 30px ${FONT}`;const w=Math.max(...lines.map(l=>g.measureText(l).width))+44,h=lines.length*42+22;panel(x-w/2,y-h/2,w,h,bc,0.86);lines.forEach((l,i)=>txt(l,x,y-h/2+48+i*42,i?26:30,i?'#fff':bc,'center',i?600:700))}
+function meter(k,ghost){const y=330;panel(16,y,1048,92,k>0.4?'#ffb070':'#ff4a4a',0.72);txt('แสงในศาลา',40,y+40,26,'#ffd8a8','left',700);txt(Math.round(k*100)+'%',300,y+40,30,k>0.4?'#ffd04a':'#ff5a5a','left',700);
+  txt('ผีอยู่: '+ghost,1040,y+40,26,k>0.4?'#cfd8ff':'#ff6a6a','right',700);
+  g.fillStyle='rgba(0,0,0,.5)';g.fillRect(40,y+58,1000,16);const gr=g.createLinearGradient(40,0,1040,0);gr.addColorStop(0,'#ff3a3a');gr.addColorStop(0.4,'#ffb040');gr.addColorStop(1,'#ffe080');g.fillStyle=gr;g.fillRect(40,y+58,1000*k,16)}
+function hud(){panel(16,72,1048,244,'#ffb070',0.74);txt('จุดเทียนไล่ผี',540,118,30,'#ffb070','center',700);
+  heart(160,170,34);txt('กดหัวใจ 1 ดวง = จุดเทียนชื่อคุณ',560,182,46,'#ffffff','center',700);
+  txt('พิมพ์อะไรก็ได้ ก็จุดได้  ·  เทียนหมด ผีจะเข้ามา',540,232,28,'#ffd0b0','center',600);
+  txt('กดติดตาม = เทียนทอง ไม่มีวันดับ',540,284,30,'#ffe066','center',700)}
+function tiktokZone(){g.fillStyle='rgba(0,0,0,.45)';g.fillRect(0,1390,W,H-1390);g.setLineDash([14,10]);g.strokeStyle='rgba(255,255,255,.5)';g.lineWidth=3;g.beginPath();g.moveTo(0,1390);g.lineTo(W,1390);g.stroke();g.setLineDash([]);
+  txt('ช่วงนี้คอมเมนต์ TikTok บัง (ในเกมจริงเทียนจะอยู่เหนือเส้นนี้)',540,1430,24,'#ddd','center',600)}
+const im=new Image();im.src=`ghost_concept/concept_${F}.png`;
+Promise.all([new Promise(r=>im.onload=r),document.fonts.load('700 40px Kanit')]).then(()=>{g.drawImage(im,-100,0,1280,1920);
+  const vg=g.createLinearGradient(0,0,0,440);vg.addColorStop(0,'rgba(0,0,0,.55)');vg.addColorStop(1,'rgba(0,0,0,0)');g.fillStyle=vg;g.fillRect(0,0,W,440);
+  hud();
+  if(F==='bright'){meter(0.82,'ไกล');
+    [['tonkla',114,1020],['aomsin',268,1020],['jaa_jaa',432,1020],['pond2002',617,1020],['fern.f',914,1020]].forEach(a=>tag(a[0],a[1],a[2],'lit',1));
+    [['ploy_99',179,880],['beer',441,880],['minnie',580,880],['nutty',730,880],['benz',852,880]].forEach(a=>tag(a[0],a[1],a[2],'lit',0.8));
+    tag('kwankwan',776,1030,'off',1);tag('น้องฟ้า',311,895,'off',0.8);
+    tag('ป้าแดง',522,1215,'gold',1.3);
+    callout(['เทียนของคุณยังไม่ติด','กดหัวใจ 1 ดวงเพื่อจุด'],820,1150,'#ffb070',X(776),Y(1030)-60);
+    callout(['ผีรออยู่ในความมืด'],560,560,'#9fb6ff',X(577),Y(600));
+    callout(['ผู้พิทักษ์ (กดติดตาม)','เทียนทองไม่มีวันดับ'],330,1280,'#ffd04a',X(522)-40,Y(1215)-110)}
+  else{meter(0.12,'ใกล้มาก');
+    const k=0.75;g.save();g.shadowColor='#ff0000';g.shadowBlur=30;panel(110,450,860,140,'#ff4a4a',0.85,'60,0,0');g.restore();txt('ไฟใกล้หมด! ผีเข้ามาแล้ว',540,512,48,'#ff6a6a','center',700);txt('ช่วยกันกดหัวใจด่วน',540,566,34,'#ffffff','center',700);
+    tag('mek.k',212,1060,'lit',1);tag('beer',140,690,'lit',0.8);tag('nutty',893,740,'lit',0.8);
+    [['tonkla',94,1000],['aomsin',268,1280],['jaa_jaa',190,860],['fern.f',965,985],['pond2002',852,890]].forEach(a=>tag(a[0],a[1],a[2],'off',0.9));
+    tag('ป้าแดง',865,1190,'gold',1.2);
+    callout(['เทียน mek.k กำลังจะโดนเป่า!'],380,1250,'#ff6a6a',X(212),Y(1060)-10);
+    callout(['ผีเข้าใกล้เทียนทองไม่ได้'],800,1270,'#ffd04a',X(865),Y(1190)-110)}
+  tiktokZone();document.title='done'});
+</script></body></html>

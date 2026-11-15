@@ -72,6 +72,8 @@ export async function sayLine(t, n, f, v) {
   if (text.length < 2) return null;
   if (v === 'f') return synth(text, "mcf-", { rate: "+2%" }, 'th-TH-PremwadeeNeural');
   if (v === 'm') return synth(text, "mcm-", { rate: "+3%", pitch: "+5%" });
+  // v = 'g' ผู้เล่าเรื่องผี (เกมจุดเทียนไล่ผี): Niwat พูดช้า เสียงต่ำ เอฟเฟกต์ห้องโถงใส่ที่หน้าเกม
+  if (v === 'g') return synth(text, "mcg-", { rate: "-8%", pitch: "-6%" });
   return synth(text, "mc-", { rate: "+7%", pitch: "+3%" });
 }
 
