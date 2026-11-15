@@ -1,0 +1,696 @@
+<!doctype html>
+<html lang="th"><head><meta charset="utf-8">
+<title>ตกปลาริมบึง LIVE</title>
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@500;700&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;background:#000;height:100%;overflow:hidden;display:flex;align-items:center;justify-content:center}
+#wrap{position:relative;height:100vh;aspect-ratio:9/16}
+#wrap canvas{position:absolute;inset:0;width:100%;height:100%}
+#ui{pointer-events:none}
+</style>
+</head><body><div id="wrap"><canvas id="gl"></canvas><canvas id="ui" width="1080" height="1920"></canvas></div>
+<script type="module">
+// ===== ตกปลาริมบึง: พิมพ์อะไรก็ได้ = ตัวละครชื่อเราเหวี่ยงเบ็ดจากท่าน้ำ ได้ปลาสุ่มความหายาก ขึ้นการ์ดใหญ่กลางจอ
+// จับแล้วปล่อยทุกตัว (ผู้ใช้รักสัตว์ ไม่มีปลาตายหรือบาดเจ็บ) ไม่มีแพ้ กดหัวใจ = ปลากินเบ็ดเร็วขึ้น
+// ทุก 5-7 นาที "ปลาตำนานโผล่" ใครพิมพ์ในช่วงนับถอยหลังได้ลุ้น ฟ้าเปลี่ยนเย็น ค่ำ กลางคืน เช้ามืด วนไปเรื่อยๆ
+// ?demo=1 คนดูจำลอง  ?test=1 เล่นเองด้วยปุ่ม  ?safe=1 ระบายส่วนที่ UI ของ TikTok บัง  ?fps=1 ดูเฟรม
+import * as THREE from '/vendor/three/build/three.module.js';
+import {EffectComposer} from '/vendor/three/examples/jsm/postprocessing/EffectComposer.js';
+import {RenderPass} from '/vendor/three/examples/jsm/postprocessing/RenderPass.js';
+import {UnrealBloomPass} from '/vendor/three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import {OutputPass} from '/vendor/three/examples/jsm/postprocessing/OutputPass.js';
+import {Reflector} from '/vendor/three/examples/jsm/objects/Reflector.js';
+import {mergeGeometries} from '/vendor/three/examples/jsm/utils/BufferGeometryUtils.js';
+
+const Q=new URLSearchParams(location.search),DEMO=Q.has('demo')||Q.has('test'),SHOWSAFE=Q.has('safe');
+const W=1080,H=1920,FONT='Kanit, Tahoma, sans-serif',SAFE_T=72,SAFE_B=1390;
+const rnd=(a,b)=>a+Math.random()*(b-a),pick=a=>a[Math.random()*a.length|0],clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),lerp=(a,b,k)=>a+(b-a)*k;
+const short=(s,n=10)=>s.length>n?s.slice(0,n)+'…':s;
+const ease={out:k=>1-(1-k)*(1-k),inOut:k=>k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2,back:k=>{const c=1.7;k-=1;return 1+k*k*((c+1)*k+c)}};
+let NOW=0,live={state:DEMO?'demo':'connecting'};
+function prng(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function canvasTex(w,h,draw){const c=document.createElement('canvas');c.width=w;c.height=h;draw(c.getContext('2d'),w,h);const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;return t}
+// ค่าที่ตั้งจากหน้า /studio (server ส่งมาเป็นคำสั่ง control ตอนหน้าเกมเปิด)
+const CFG={mc:1,welcome:1,gap:15,legend:6,cycle:12};
+
+// ---------- ฉากสามมิติ ----------
+const renderer=new THREE.WebGLRenderer({canvas:document.getElementById('gl'),antialias:true});
+renderer.setPixelRatio(1);renderer.setSize(W,H,false);renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=0.9;
+const scene=new THREE.Scene();scene.fog=new THREE.FogExp2(0x8a5a6a,0.0032);
+const camera=new THREE.PerspectiveCamera(52,W/H,0.1,1500);camera.layers.enable(1);   // ชั้น 1 = ของที่ไม่วาดในเงาสะท้อนน้ำ
+const CAM0=new THREE.Vector3(0,24,56),LOOK=new THREE.Vector3(0,0,4);camera.position.copy(CAM0);camera.lookAt(LOOK);
+const T={value:0};
+function tinted(geo,hex){const c=new THREE.Color(hex),n=geo.attributes.position.count,a=new Float32Array(n*3);for(let i=0;i<n;i++){a[i*3]=c.r;a[i*3+1]=c.g;a[i*3+2]=c.b}geo.setAttribute('color',new THREE.BufferAttribute(a,3));return geo}
+function part(geo,hex,m){const g2=geo.index?geo.toNonIndexed():geo.clone();if(m)g2.applyMatrix4(m);return tinted(g2,hex)}
+const M4=(x,y,z,rx=0,ry=0,rz=0,sx=1,sy=sx,sz=sx)=>new THREE.Matrix4().compose(new THREE.Vector3(x,y,z),new THREE.Quaternion().setFromEuler(new THREE.Euler(rx,ry,rz)),new THREE.Vector3(sx,sy,sz));
+const VC=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.85});
+const solid=(parts,mat=VC)=>new THREE.Mesh(mergeGeometries(parts),mat);
+const glowTex=(()=>{const c=document.createElement('canvas');c.width=c.height=128;const x=c.getContext('2d'),g=x.createRadialGradient(64,64,0,64,64,64);
+  g.addColorStop(0,'rgba(255,255,255,1)');g.addColorStop(0.25,'rgba(255,255,255,.55)');g.addColorStop(1,'rgba(255,255,255,0)');x.fillStyle=g;x.fillRect(0,0,128,128);return new THREE.CanvasTexture(c)})();
+function glowSprite(color,s,op=1){const m=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex,color,transparent:true,opacity:op,blending:THREE.AdditiveBlending,depthWrite:false}));m.scale.set(s,s,1);return m}
+
+// ---------- ช่วงเวลาของวัน: เย็น > ค่ำ > กลางคืน > เช้ามืด แล้ววนกลับ (รอบละ CFG.cycle นาที) ----------
+// แต่ละช่วงกำหนดสีฟ้า 3 ชั้น สีหมอก แสง ความสว่างดวงอาทิตย์ ดาว และไฟบนท่าน้ำ
+const PH=[
+  {n:'เย็น',top:0x2a3a8a,mid:0xd0708a,hor:0xffb066,fog:0x9a6070,sun:1,sunY:26,moon:0,star:0,hemi:1.15,lamp:0.35,water:0xc8a0a0},
+  {n:'ค่ำ',top:0x1c2466,mid:0x7a4a8a,hor:0xff7a5a,fog:0x5a4070,sun:0.55,sunY:6,moon:0.4,star:0.35,hemi:0.85,lamp:0.8,water:0xa088b0},
+  {n:'กลางคืน',top:0x0a1034,mid:0x22285a,hor:0x4a3a78,fog:0x1e2248,sun:0,sunY:-30,moon:1,star:1,hemi:0.6,lamp:1,water:0x8a90c8},
+  {n:'เช้ามืด',top:0x26386e,mid:0x8a7aa8,hor:0xffc0a0,fog:0x8a7a98,sun:0.4,sunY:4,moon:0.3,star:0.2,hemi:0.95,lamp:0.6,water:0xb0a8c8}];
+const DAY={k:0,cur:{}};
+function dayAt(t){const L=CFG.cycle*60,u=((t%L)+L)%L/L*PH.length,i=Math.floor(u),f=ease.inOut(clamp((u-i-0.7)/0.3,0,1)),a=PH[i],b=PH[(i+1)%PH.length],o={n:a.n,i};
+  for(const k in a){if(k==='n')continue;if(k==='top'||k==='mid'||k==='hor'||k==='fog'||k==='water')o[k]=new THREE.Color(a[k]).lerp(new THREE.Color(b[k]),f);else o[k]=lerp(a[k],b[k],f)}return o}
+const sky=new THREE.Mesh(new THREE.SphereGeometry(700,32,16),new THREE.ShaderMaterial({side:THREE.BackSide,depthWrite:false,fog:false,
+  uniforms:{top:{value:new THREE.Color()},mid:{value:new THREE.Color()},hor:{value:new THREE.Color()},sunDir:{value:new THREE.Vector3(0,0.05,-1)},sunK:{value:1}},
+  vertexShader:'varying vec3 vP;void main(){vP=normalize(position);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
+  fragmentShader:'uniform vec3 top,mid,hor,sunDir;uniform float sunK;varying vec3 vP;void main(){float h=vP.y;vec3 c=h>0.1?mix(mid,top,smoothstep(.1,.65,h)):mix(hor,mid,smoothstep(-.02,.1,h));if(h<-.02)c=mid*.55;float s=max(0.,dot(vP,normalize(sunDir)));c+=vec3(1.,.62,.3)*pow(s,6.)*.55*sunK+vec3(1.,.8,.5)*pow(s,60.)*.6*sunK;gl_FragColor=vec4(c,1.);}'}));
+scene.add(sky);
+// ดาว จางตามช่วงเวลา
+const starMat=new THREE.ShaderMaterial({uniforms:{time:T,amt:{value:0}},transparent:true,depthWrite:false,fog:false,blending:THREE.AdditiveBlending,
+  vertexShader:'attribute float ph;attribute float sz;uniform float time;varying float vA;void main(){vA=0.5+0.5*sin(time*(0.7+fract(ph*3.7)*1.8)+ph*6.283);gl_PointSize=sz;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
+  fragmentShader:'uniform float amt;varying float vA;void main(){float a=smoothstep(.5,.05,length(gl_PointCoord-.5));gl_FragColor=vec4(vec3(1.,.96,.88)*a*(.3+.7*vA)*amt,1.);}'});
+{const n=1400,p=new Float32Array(n*3),ph=new Float32Array(n),sz=new Float32Array(n);for(let i=0;i<n;i++){const a=Math.random()*Math.PI*2,e=0.08+Math.random()*0.9,r=640;p[i*3]=Math.cos(a)*Math.cos(e)*r;p[i*3+1]=Math.sin(e)*r;p[i*3+2]=Math.sin(a)*Math.cos(e)*r;ph[i]=Math.random();sz[i]=(1.3+Math.random()*2)*(Math.random()<0.07?1.9:1)}
+  const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(p,3));geo.setAttribute('ph',new THREE.BufferAttribute(ph,1));geo.setAttribute('sz',new THREE.BufferAttribute(sz,1));scene.add(new THREE.Points(geo,starMat))}
+// ดวงอาทิตย์ (ลับขอบฟ้าตอนค่ำ) กับพระจันทร์
+const sun=new THREE.Group();{const core=new THREE.Mesh(new THREE.CircleGeometry(16,40),new THREE.MeshBasicMaterial({color:0xffe0a0,fog:false}));sun.add(core);for(const [s,o] of [[70,.5],[170,.22]]){const g=glowSprite(0xffa060,s,o);g.material.fog=false;sun.add(g)}sun.position.set(-40,26,-560);scene.add(sun)}
+const moon=new THREE.Group();{const tex=canvasTex(256,256,(x,w,h)=>{x.fillStyle='#fff3d6';x.fillRect(0,0,w,h);const R=prng(3);for(let i=0;i<14;i++){const gx=R()*w,gy=R()*h,r=12+R()*34,gr=x.createRadialGradient(gx,gy,0,gx,gy,r);gr.addColorStop(0,'rgba(170,155,125,.5)');gr.addColorStop(1,'rgba(170,155,125,0)');x.fillStyle=gr;x.fillRect(gx-r,gy-r,r*2,r*2)}});
+  const m=new THREE.Mesh(new THREE.SphereGeometry(10,24,16),new THREE.MeshBasicMaterial({map:tex,color:0xe6dfd0,fog:false,transparent:true}));m.rotation.y=-1.2;moon.add(m);for(const [s,o] of [[36,.3],[95,.12]]){const g=glowSprite(0xffe8c0,s,o);g.material.fog=false;moon.add(g)}moon.position.set(70,150,-420);scene.add(moon)}
+// เมฆ: สีอมชมพูตอนเย็น เทาม่วงตอนกลางคืน
+const cloudTex=canvasTex(512,256,(x,w,h)=>{const R=prng(5);for(let i=0;i<46;i++){const cx=w*(0.12+0.76*R()),cy=h*(0.38+0.3*R()),r=30+R()*70,gr=x.createRadialGradient(cx,cy,0,cx,cy,r);gr.addColorStop(0,'rgba(255,255,255,.2)');gr.addColorStop(1,'rgba(255,255,255,0)');x.fillStyle=gr;x.fillRect(cx-r,cy-r,r*2,r*2)}});
+const clouds=[];for(let i=0;i<8;i++){const s=new THREE.Sprite(new THREE.SpriteMaterial({map:cloudTex,color:0xffb0a0,transparent:true,opacity:rnd(.35,.6),depthWrite:false,fog:false}));
+  const sc=rnd(200,340);s.scale.set(sc,sc*0.33,1);s.position.set(-330+i*95+rnd(-25,25),rnd(45,150),rnd(-520,-380));scene.add(s);clouds.push(s)}
+// ภูเขาสามชั้นฝั่งตรงข้าม
+const ridges=[];
+function ridge(z,top,base,h,seed){const pos=[],col=[],idx=[],ct=new THREE.Color(top),cb=new THREE.Color(base);let n=0;
+  for(let x=-620;x<=620;x+=8){const y=Math.max(2,h*(0.5+0.3*Math.sin(x*0.011+seed)+0.2*Math.sin(x*0.029+seed*2)+0.08*Math.sin(x*0.09+seed*3)+0.03*Math.sin(x*0.23+seed*5)));
+    pos.push(x,y,0,x,-6,0);col.push(ct.r,ct.g,ct.b,cb.r,cb.g,cb.b);if(n){const a=n*2;idx.push(a-2,a-1,a,a-1,a+1,a)}n++}
+  const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));geo.setAttribute('color',new THREE.Float32BufferAttribute(col,3));geo.setIndex(idx);
+  const m=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.DoubleSide,transparent:true}));m.position.z=z;scene.add(m);ridges.push(m)}
+ridge(-330,0x5a3a6a,0xb07a8a,80,1.3);ridge(-230,0x3a2a52,0x7a5070,50,4.1);ridge(-160,0x241c3a,0x4a3452,24,7.7);
+// ผิวน้ำบึง: สะท้อนฟ้าและท่าน้ำ ระลอกคลื่นบิดเงา ประกายแดดบนยอดคลื่น
+const lake={name:'LakeShader',uniforms:{color:{value:null},tDiffuse:{value:null},textureMatrix:{value:null},time:{value:0},glow:{value:0}},
+  vertexShader:`uniform mat4 textureMatrix;varying vec4 vUv;varying vec2 vP;
+    #include <common>
+    #include <logdepthbuf_pars_vertex>
+    void main(){vUv=textureMatrix*vec4(position,1.0);vP=position.xy;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);
+    #include <logdepthbuf_vertex>
+    }`,
+  fragmentShader:`uniform vec3 color;uniform sampler2D tDiffuse;uniform float time,glow;varying vec4 vUv;varying vec2 vP;
+    #include <logdepthbuf_pars_fragment>
+    void main(){
+    #include <logdepthbuf_fragment>
+    vec2 w=vec2(sin(vP.y*0.9+time*1.1)+0.6*sin(vP.y*2.3-time*1.7+vP.x*0.35)+0.35*sin(vP.y*5.1+time*2.3+vP.x*0.8),0.5*sin(vP.x*0.6+time*0.9+vP.y*1.3));
+    float fade=clamp(0.12/max(fwidth(vP.y),0.0001),0.0,1.0);
+    vec4 uv=vUv;uv.xy+=w*vec2(0.007,0.004)*uv.w*fade;
+    vec3 refl=texture2DProj(tDiffuse,uv).rgb;
+    float glint=pow(max(0.,sin(vP.y*3.1+time*1.6+sin(vP.x*0.45+time*0.7)*1.8)),30.)*0.05*fade*max(0.,sin(vP.x*1.3+vP.y*0.7+time*0.5));
+    float d=length(vP-vec2(0.,40.));float ring=glow*(0.5+0.5*sin(d*0.8-time*3.))*smoothstep(60.,5.,d);
+    gl_FragColor=vec4(refl*color+vec3(0.02,0.03,0.06)+glint*vec3(1.0,0.8,0.6)+ring*vec3(1.,.78,.3)*0.35,1.0);
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
+    }`};
+const water=new Reflector(new THREE.PlaneGeometry(1200,1200),{textureWidth:540,textureHeight:960,color:0xc8a0a0,clipBias:0.003,shader:lake});
+water.material.uniforms.time=T;water.rotation.x=-Math.PI/2;scene.add(water);
+// แสง: ฟ้า + แดดเย็นสีส้มจากด้านหลังซ้าย
+const hemi=new THREE.HemisphereLight(0xffc8b0,0x2a2440,1.1);scene.add(hemi);
+const sunL=new THREE.DirectionalLight(0xffb070,1.2);sunL.position.set(-30,25,-80);scene.add(sunL);
+const fillL=new THREE.DirectionalLight(0x8090ff,0.25);fillL.position.set(30,20,40);scene.add(fillL);
+
+// ---------- ท่าน้ำไม้: พื้นไม้ทอดยาวกลางบึง เสาไม้ปักน้ำ เสาโคมไฟ ----------
+const PIER={x:3.6,y:1.3,z0:30,z1:-26};
+const lamps=[];
+{const ps=[],R=prng(21),plankC=[0x7a5638,0x6e4c32,0x86603e,0x704e34];
+  for(let z=PIER.z0;z>PIER.z1;z-=0.62){ps.push(part(new THREE.BoxGeometry(PIER.x*2+0.3,0.16,0.56),pick(plankC),M4(rnd(-0.06,0.06),PIER.y,z,0,rnd(-0.02,0.02),0)))}
+  for(const sx of [-1,1]){ps.push(part(new THREE.BoxGeometry(0.24,0.3,PIER.z0-PIER.z1),0x4a3424,M4(sx*(PIER.x+0.05),PIER.y-0.2,(PIER.z0+PIER.z1)/2)));
+    for(let z=PIER.z0-1;z>PIER.z1;z-=5){ps.push(part(new THREE.CylinderGeometry(0.2,0.24,4,7),0x3e2c20,M4(sx*(PIER.x+0.1),PIER.y-2,z)))}}
+  // ศาลาเล็กปลายท่า
+  const zS=PIER.z1+3;for(const [x,z] of [[-2.2,zS-2],[2.2,zS-2],[-2.2,zS+2],[2.2,zS+2]])ps.push(part(new THREE.CylinderGeometry(0.16,0.16,3.6,6),0x5a3a26,M4(x,PIER.y+1.8,z)));
+  ps.push(part(new THREE.ConeGeometry(4.2,2.2,4),0x7a3a2a,M4(0,PIER.y+4.6,zS,0,Math.PI/4,0,1,1,1)));ps.push(part(new THREE.ConeGeometry(4.8,0.5,4),0x5a2a20,M4(0,PIER.y+3.65,zS,0,Math.PI/4,0)));
+  const pier=solid(ps);scene.add(pier);
+  for(let z=PIER.z0-4;z>PIER.z1+4;z-=10)for(const sx of [-1,1]){const zz=z+(sx>0?5:0),post=solid([part(new THREE.CylinderGeometry(0.08,0.1,2.6,6),0x3a2a1e,M4(0,1.3,0)),part(new THREE.BoxGeometry(0.42,0.5,0.42),0x2a1e16,M4(0,2.75,0))]);
+    post.position.set(sx*(PIER.x-0.15),PIER.y,zz);scene.add(post);const gl=glowSprite(0xffb060,2.6,0.8);gl.position.set(sx*(PIER.x-0.15),PIER.y+2.8,zz);scene.add(gl);lamps.push(gl)}}
+// ฝั่งตรงข้ามไกลๆ: บ้านเรือนไทยริมน้ำ ต้นตาล ไฟหน้าต่าง
+const SHORE=-150;
+const winGlows=[];
+{const ps=[],R=prng(7);
+  const land=new THREE.Mesh(new THREE.PlaneGeometry(1400,90),new THREE.MeshStandardMaterial({color:0x2a2030,roughness:1}));land.rotation.x=-Math.PI/2;land.position.set(0,0.05,SHORE-45);scene.add(land);
+  for(let i=0;i<9;i++){const x=-130+i*32+R()*12,s=1.6+R()*0.7,z=SHORE-4-R()*6;
+    ps.push(part(new THREE.BoxGeometry(5*s,3*s,4*s),0x3a2a34,M4(x,1.8*s+1.2,z)));
+    ps.push(part(new THREE.ConeGeometry(4.6*s,3.4*s,4),0x2a1e28,M4(x,4.9*s+1.2,z,0,Math.PI/4,0,1,1,0.75)));
+    for(let k=0;k<4;k++)ps.push(part(new THREE.CylinderGeometry(0.15*s,0.15*s,2.6,5),0x22181e,M4(x-2*s+k*1.33*s,0,z+1.6*s)));
+    if(R()<0.75){const gl=glowSprite(0xffb050,3.4*s,0.85);gl.position.set(x+rnd(-1,1)*s,2.2*s+1.2,z+2.05*s);scene.add(gl);winGlows.push(gl)}}
+  for(let i=0;i<16;i++){const x=-200+i*26+R()*14,z=SHORE-12-R()*10,h=12+R()*8;for(let k=0;k<6;k++)ps.push(part(new THREE.CylinderGeometry(0.35,0.45,h/6,5),0x1e1620,M4(x+k*0.12,k*h/6+h/12,z)));
+    for(let k=0;k<8;k++){const a=k/8*6.283;ps.push(part(new THREE.ConeGeometry(0.6,4.2,4),0x1a1a20,M4(x+Math.cos(a)*1.4,h+0.4,z+Math.sin(a)*1.4,Math.sin(a)*1.25,0,-Math.cos(a)*1.25)))}}
+  scene.add(solid(ps,new THREE.MeshStandardMaterial({vertexColors:true,roughness:1})))}
+// กอบัวกับกกริมท่า (ใกล้กล้อง) เรือพายลอยกลางบึง
+const lotusFl=[];
+{const ps=[],R=prng(31);
+  for(let i=0;i<34;i++){const sx=R()<.5?-1:1,x=sx*(9+R()*22),z=-20+R()*48;ps.push(part(new THREE.CylinderGeometry(1.1+R()*0.6,1.1,0.06,14),R()<.5?0x3f6a3a:0x4a7a42,M4(x,0.08,z)));
+    if(R()<0.35){const f=new THREE.Group(),pc=R()<.7?0xff9ac0:0xfff0f4;for(let k=0;k<8;k++){const a=k/8*6.283;const pet=new THREE.Mesh(new THREE.SphereGeometry(0.28,7,5),new THREE.MeshStandardMaterial({color:pc,emissive:pc,emissiveIntensity:0.15,roughness:.6}));pet.scale.set(0.55,1.25,0.35);pet.position.set(Math.cos(a)*0.22,0.3,Math.sin(a)*0.22);pet.rotation.set(Math.sin(a)*0.5,0,-Math.cos(a)*0.5);f.add(pet)}
+      f.position.set(x+rnd(-0.4,0.4),0.1,z);scene.add(f);lotusFl.push(f)}}
+  for(let i=0;i<70;i++){const sx=R()<.5?-1:1,x=sx*(15+R()*30),z=8+R()*30;for(let k=0;k<5;k++)ps.push(part(new THREE.ConeGeometry(0.07,2.8+R()*1.6,4),0x3a4a2a,M4(x+rnd(-.5,.5),1.3,z+rnd(-.5,.5),rnd(-.15,.15),0,rnd(-.15,.15))))}
+  scene.add(solid(ps));
+  const boat=solid([part(new THREE.BoxGeometry(1.6,0.5,6),0x5a3a26,M4(0,0.25,0)),part(new THREE.ConeGeometry(0.8,1.6,4),0x5a3a26,M4(0,0.25,3.6,Math.PI/2,0,0,1,1,0.4)),part(new THREE.ConeGeometry(0.8,1.6,4),0x5a3a26,M4(0,0.25,-3.6,-Math.PI/2,0,0,1,1,0.4))]);
+  boat.position.set(-34,0,-60);boat.rotation.y=0.6;scene.add(boat);DAY.boat=boat}
+// หิ่งห้อยตอนกลางคืน และนกบินกลับรังตอนเย็น
+const flies=[];for(let i=0;i<26;i++){const s=glowSprite(0xffe890,rnd(.5,.9),0);s.position.set(rnd(-30,30),rnd(.6,5),rnd(-30,30));s.userData={p:rnd(0,9),bx:s.position.x,bz:s.position.z};scene.add(s);flies.push(s)}
+const birdTex=canvasTex(64,32,(x)=>{x.strokeStyle='#1a1420';x.lineWidth=4;x.lineCap='round';x.beginPath();x.moveTo(4,10);x.quadraticCurveTo(18,4,32,18);x.quadraticCurveTo(46,4,60,10);x.stroke()});
+const birds=[];for(let i=0;i<7;i++){const s=new THREE.Sprite(new THREE.SpriteMaterial({map:birdTex,transparent:true,depthWrite:false,fog:false}));s.scale.set(5,2.5,1);s.userData={o:rnd(0,60),y:rnd(50,80),z:rnd(-260,-200),dy:rnd(-6,6)};scene.add(s);birds.push(s)}
+
+// ---------- ปลา: ปั้นด้วยโค้ด ลำตัวรี ท้องสีอ่อน ครีบ หาง ตา ----------
+// rar: 0 ธรรมดา 1 ไม่ธรรมดา 2 หายาก 3 ตำนาน   kg = ช่วงน้ำหนัก   pat = ลาย (stripe ลายขวาง spot จุด scale เกล็ดเงา plain)
+const RAR=[{n:'ธรรมดา',c:'#d6dee6',w:62},{n:'ไม่ธรรมดา',c:'#8ee07a',w:27},{n:'หายาก',c:'#62c2ff',w:10},{n:'ตำนาน',c:'#ffc83a',w:1}];
+const FISH=[
+  {n:'ปลานิล',img:'nil',r:0,kg:[0.3,1.6],body:0x7a8aa0,belly:0xd8dce0,fin:0xa86a6a,pat:'stripe'},
+  {n:'ปลาตะเพียน',img:'tapian',r:0,kg:[0.2,1.1],body:0xb8c0c8,belly:0xf0f0e8,fin:0xe08a6a,pat:'scale'},
+  {n:'ปลาหมอ',img:'mo',r:0,kg:[0.1,0.5],body:0x4a6a4a,belly:0xb8c0a0,fin:0x3a4a3a,pat:'plain'},
+  {n:'ปลาสลิด',img:'salit',r:0,kg:[0.1,0.4],body:0x7a7a52,belly:0xd0d0b0,fin:0x6a6a42,pat:'stripe'},
+  {n:'ปลาดุก',img:'duk',r:0,kg:[0.3,2.2],body:0x4a3e36,belly:0xa89a88,fin:0x3a302a,pat:'plain',long:1},
+  {n:'ปลาช่อน',img:'chon',r:1,kg:[1,4.5],body:0x3a3a34,belly:0xb0a890,fin:0x2a2a26,pat:'spot',long:1},
+  {n:'ปลาตะเพียนทอง',img:'tapian_thong',r:1,kg:[0.5,2.2],body:0xe0a83a,belly:0xfff0c0,fin:0xff7a4a,pat:'scale'},
+  {n:'ปลาสวาย',img:'sawai',r:1,kg:[2,9],body:0x6a7280,belly:0xd8dce0,fin:0x5a606a,pat:'plain',long:1},
+  {n:'ปลากราย',img:'krai',r:1,kg:[1,6],body:0x9aa0aa,belly:0xe8e8e8,fin:0x8a909a,pat:'spot'},
+  {n:'ปลาเทพา',img:'thepa',r:2,kg:[10,45],body:0x5a6470,belly:0xd0d4d8,fin:0x4a525a,pat:'plain',long:1},
+  {n:'ปลายี่สก',img:'yisok',r:2,kg:[3,16],body:0xd8b04a,belly:0xfff4d0,fin:0xd88a3a,pat:'stripe'},
+  {n:'ปลากระโห้',img:'kraho',r:2,kg:[10,55],body:0x8a9098,belly:0xf0f0f0,fin:0xb07070,pat:'scale'},
+  {n:'ปลาบึก',img:'buek',r:3,kg:[90,260],body:0x6a7a8a,belly:0xe0e6ea,fin:0x5a6a7a,pat:'plain',long:1},
+  {n:'ปลามังกรทอง',img:'mangkon',r:3,kg:[2,7],body:0xffc040,belly:0xfff0b0,fin:0xff8a30,pat:'scale',long:1,glow:1},
+  {n:'ปลาคาร์ปจันทรา',img:'carp_moon',r:3,kg:[8,30],body:0xf4f4ff,belly:0xffffff,fin:0xff6a6a,pat:'spot',glow:1}];
+function rollFish(min=0,force){const r=force??(()=>{let w=RAR.map((x,i)=>i>=min?x.w*(i===3&&min<3?1:1):0),s=w.reduce((a,b)=>a+b,0),u=Math.random()*s;for(let i=0;i<4;i++){if((u-=w[i])<0)return i}return min})();
+  const f=pick(FISH.filter(x=>x.r===r)),k=Math.pow(Math.random(),1.8);return {f,kg:+(f.kg[0]+(f.kg[1]-f.kg[0])*k).toFixed(f.kg[1]>20?1:2),r}}
+// ภาพปลาวาดโดย Codex (art/fish/*.png ตัดพื้นแล้ว หัวหันขวา) ใช้เป็น sprite ในฉากและวาดบนการ์ด
+const FIMG={},FTEX={};
+for(const f of FISH){const im=new Image();im.src='/art/fish/'+f.img+'.png';FIMG[f.n]=im;f.ar=2.2;
+  const t=new THREE.TextureLoader().load('/art/fish/'+f.img+'.png',tx=>{f.ar=tx.image.width/tx.image.height});t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=4;FTEX[f.n]=t}
+// flip = หันหัวไปทางซ้าย (คนตกฝั่งซ้ายของท่า)
+function fishMesh(f,flip){const m=new THREE.Sprite(new THREE.SpriteMaterial({map:FTEX[f.n],transparent:true,depthWrite:false,side:THREE.DoubleSide,fog:false}));m.userData={f,flip:flip?-1:1};m.layers.set(1);return m}
+function fishSize(m,len){const u=m.userData;m.scale.set(len*u.flip,len/(u.f.ar||2.2),1)}
+
+// ---------- คนตกปลา: นั่งริมท่า ห้อยขา หมวกสาน คันเบ็ด สายเอ็น ทุ่นแดงขาว ----------
+const SKIN=[0xe0b896,0xd9a982,0xc89870,0xb88a62],SHIRT=[0xd8584a,0x4a7ab8,0xe0b040,0x8a5ab0,0x4aa088,0xe08a3a,0xe8e4dc,0xe07aa0,0x5ab0d0,0x7ab04a],PANTS=[0x2a2a3c,0x3a3448,0x4a3a30,0x26303a];
+const lineMat=new THREE.LineBasicMaterial({color:0xfff6e0,transparent:true,opacity:0.75});
+const bobG=mergeGeometries([part(new THREE.SphereGeometry(0.17,10,8,0,6.283,0,1.57),0xff3a3a),part(new THREE.SphereGeometry(0.17,10,8,0,6.283,1.57,1.57),0xfafafa),part(new THREE.CylinderGeometry(0.025,0.025,0.25,4),0xfafafa,M4(0,0.22,0))]);
+function makeFisher(o={}){const g=new THREE.Group(),shirt=o.shirt??pick(SHIRT),skin=pick(SKIN),ps=[];
+  ps.push(part(new THREE.CylinderGeometry(0.28,0.34,0.75,8),shirt,M4(0,0.42,0)));
+  ps.push(part(new THREE.SphereGeometry(0.3,8,6),shirt,M4(0,0.8,0,0,0,0,1.02,0.5,0.8)));
+  ps.push(part(new THREE.SphereGeometry(0.27,10,8),skin,M4(0,1.12,0.02)));
+  ps.push(part(new THREE.SphereGeometry(0.28,10,6,0,6.283,0,1.7),0x1e1614,M4(0,1.15,-0.03,-0.45,0,0)));
+  const hat=o.hat??(Math.random()<0.7);if(hat){ps.push(part(new THREE.CylinderGeometry(0.62,0.66,0.05,16),0xd8b878,M4(0,1.34,0)));ps.push(part(new THREE.ConeGeometry(0.34,0.32,14),0xc8a868,M4(0,1.5,0)));ps.push(part(new THREE.CylinderGeometry(0.345,0.345,0.06,14),o.band??0xb03a2a,M4(0,1.38,0)))}
+  const pc=pick(PANTS);ps.push(part(new THREE.CylinderGeometry(0.15,0.13,0.62,6),pc,M4(-0.15,0.0,0.32,Math.PI/2.4,0,0)));ps.push(part(new THREE.CylinderGeometry(0.15,0.13,0.62,6),pc,M4(0.15,0.0,0.32,Math.PI/2.4,0,0)));
+  ps.push(part(new THREE.CylinderGeometry(0.12,0.1,0.6,6),pc,M4(-0.15,-0.42,0.58)));ps.push(part(new THREE.CylinderGeometry(0.12,0.1,0.6,6),pc,M4(0.15,-0.42,0.58)));
+  ps.push(part(new THREE.CylinderGeometry(0.085,0.075,0.62,6),shirt,M4(-0.3,0.62,0.26,-1.1,0,0.25)));ps.push(part(new THREE.CylinderGeometry(0.085,0.075,0.62,6),shirt,M4(0.3,0.62,0.26,-1.1,0,-0.25)));
+  const body=solid(ps);g.add(body);
+  // คันเบ็ดหมุนรอบมือ ปลายคันใช้หาตำแหน่งสายเอ็น
+  const rod=new THREE.Group();rod.position.set(0,0.62,0.52);const pole=new THREE.Mesh(new THREE.CylinderGeometry(0.016,0.036,2.6,5),new THREE.MeshStandardMaterial({color:0x4a3020,roughness:.6}));pole.position.y=1.3;rod.add(pole);
+  const reel=new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.09,0.08,10),new THREE.MeshStandardMaterial({color:0x9aa0a8,metalness:.6,roughness:.3}));reel.rotation.z=Math.PI/2;reel.position.set(0.08,0.35,0);rod.add(reel);
+  const tip=new THREE.Object3D();tip.position.y=2.6;rod.add(tip);rod.rotation.x=0.95;g.add(rod);
+  // ถังน้ำใส่ปลา วางบนพื้นท่าข้างตัว
+  const bucket=solid([part(new THREE.CylinderGeometry(0.24,0.19,0.36,14,1,true),0x5a86a8,M4(0,0.18,0)),part(new THREE.CylinderGeometry(0.19,0.19,0.02,14),0x48708e,M4(0,0.01,0)),part(new THREE.TorusGeometry(0.24,0.025,6,18),0x8ab0c8,M4(0,0.36,0,Math.PI/2,0,0)),part(new THREE.CircleGeometry(0.22,16),0x6ac8e8,M4(0,0.31,0,-Math.PI/2,0,0)),part(new THREE.TorusGeometry(0.2,0.012,4,12,Math.PI),0x9aa0a8,M4(0,0.38,0))]);
+  bucket.material=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.4,metalness:.3,side:THREE.DoubleSide});bucket.position.set(0.68,0,-0.2);g.add(bucket);
+  const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(18*3),3));const line=new THREE.Line(geo,lineMat);line.frustumCulled=false;
+  const bob=new THREE.Mesh(bobG,new THREE.MeshStandardMaterial({vertexColors:true,roughness:.4,emissive:0x401010,emissiveIntensity:0.4}));bob.visible=false;
+  g.scale.setScalar(FS);g.traverse(x=>x.layers.set(1));line.layers.set(1);bob.layers.set(1);
+  return {g,rod,tip,line,bob,hat,bucket}}
+
+const crownMat=t=>new THREE.MeshStandardMaterial({color:0xffc83a,metalness:.85,roughness:.25,emissive:0xa06a10,emissiveIntensity:[0,0.35,0.6,0.9][t]});
+function crownMesh(t){const g=new THREE.Group(),m=crownMat(t);const ring=new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.33,0.16,18,1,true),m);ring.material.side=THREE.DoubleSide;g.add(ring);
+  for(let i=0;i<5;i++){const a=i/5*6.283,c=new THREE.Mesh(new THREE.ConeGeometry(0.075,0.24,6),m);c.position.set(Math.cos(a)*0.29,0.18,Math.sin(a)*0.29);g.add(c);
+    const j=new THREE.Mesh(new THREE.SphereGeometry(0.05,8,6),new THREE.MeshStandardMaterial({color:[0xff3a5a,0x3ac8ff,0x6aff8a,0xff3a5a,0xc06aff][i],emissive:[0xff3a5a,0x3ac8ff,0x6aff8a,0xff3a5a,0xc06aff][i],emissiveIntensity:0.6}));j.position.set(Math.cos(a)*0.31,0.02,Math.sin(a)*0.31);g.add(j)}
+  if(t>=2){const gl=glowSprite(0xffd060,t>=3?1.5:1.1,t>=3?0.32:0.2);gl.position.y=0.1;g.add(gl)}
+  if(t>=3)for(let i=0;i<3;i++){const sp=glowSprite(0xfff0b0,0.28,0.7);sp.userData.orbit=i;g.add(sp)}
+  g.scale.setScalar(t>=3?1.35:1);g.traverse(o=>o.layers.set(1));return g}
+const crownTier=p=>!p.coins?0:p.coins>=100?3:p.coins>=10?2:1;
+function crown(p){const F=p.F,t=crownTier(p);if(!F||!t||(F.crownT||0)>=t)return;if(F.crown)F.g.remove(F.crown);F.crown=crownMesh(t);F.crown.position.y=F.hat?1.74:1.45;F.g.add(F.crown);F.crownT=t}
+// ที่นั่งริมท่า 2 ฝั่ง ฝั่งละ 7 ที่ คนนั่งหันออกนอกท่า ทุ่นตกห่างท่าน้ำออกไป
+const FS=2.1,SLOTS=[];for(let i=0;i<7;i++)for(const sx of [-1,1])SLOTS.push({x:sx*(PIER.x-0.1),z:24-i*5.6-(sx>0?2.8:0),sx,who:null});
+SLOTS.sort((a,b)=>Math.abs(a.z-10)-Math.abs(b.z-10));
+// ที่ใกล้กล้องที่สุดฝั่งละที่ เก็บไว้ให้อันดับ 1 (คนอื่นนั่งได้เฉพาะตอนที่นั่งเต็ม)
+const VIP={give:SLOTS.filter(x=>x.sx<0).sort((a,b)=>b.z-a.z)[0],catch:SLOTS.filter(x=>x.sx>0).sort((a,b)=>b.z-a.z)[0]};VIP.give.vip='give';VIP.catch.vip='catch';
+function vipWho(){const real=Object.values(P).filter(p=>!p.npc),give=real.filter(p=>p.coins>0).sort((a,b)=>b.coins-a.coins)[0]||null,
+  cat=real.filter(p=>p!==give&&(p.caughtN||0)>=3).sort((a,b)=>(b.caughtN||0)-(a.caughtN||0))[0]||null;return {give,catch:cat}}
+// ย้ายตัวละครไปที่นั่งใหม่ (สลับกับคนที่นั่งอยู่ ถ้ามี) ย้ายได้เฉพาะตอนทั้งสองคนว่าง ไม่ได้กำลังตก
+function placeAt(F,slot){F.slot=slot;slot.who=F;F.g.position.set(slot.x,PIER.y+0.05,slot.z);F.g.rotation.y=slot.sx<0?-Math.PI/2:Math.PI/2;F.pop=NOW}
+function moveTo(F,slot){if(F.slot===slot)return true;const o=slot.who;if(F.st!=='idle'||(o&&o.st!=='idle'))return false;const old=F.slot;old.who=null;slot.who=null;placeAt(F,slot);if(o)placeAt(o,old);return true}
+let vipT=0;function updVip(dt){if((vipT-=dt)>0)return;vipT=1;const w=vipWho();for(const k of ['give','catch']){const p=w[k],slot=VIP[k];if(p&&p.F&&p.F.slot!==slot&&moveTo(p.F,slot)){p.F.vipT=NOW;sfxAt('vip',0.85,0,3);if(k==='give')banner(`${short(p.name,12)} ขึ้นที่นั่งหน้าสุด`,'#ffd04a','ผู้สนับสนุนอันดับ 1');else banner(`${short(p.name,12)} ขึ้นที่นั่งหน้าสุด`,'#7fd8ff','นักตกปลาอันดับ 1 ของวันนี้')}}}
+// แสงส่องจากฟ้าที่ที่นั่ง VIP (ทองสำหรับผู้สนับสนุน ฟ้าสำหรับนักตกปลา)
+const beamTex=canvasTex(8,128,(x,w,h)=>{const gr=x.createLinearGradient(0,0,0,h);gr.addColorStop(0,'rgba(255,255,255,0)');gr.addColorStop(1,'rgba(255,255,255,.9)');x.fillStyle=gr;x.fillRect(0,0,w,h)});
+const beams={};for(const k of ['give','catch']){const m=new THREE.Mesh(new THREE.CylinderGeometry(0.5,2.2,22,18,1,true),new THREE.MeshBasicMaterial({map:beamTex,color:k==='give'?0xffd070:0x8ad8ff,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide,fog:false}));
+  m.position.set(VIP[k].x,PIER.y+11,VIP[k].z);m.layers.set(1);scene.add(m);beams[k]=m}
+function updBeams(){const w=vipWho();for(const k of ['give','catch']){const on=VIP[k].who&&w[k]&&VIP[k].who.p===w[k];const m=beams[k].material;m.opacity=lerp(m.opacity,on?0.22+0.05*Math.sin(NOW*2):0,0.05);beams[k].rotation.y+=0.004}}   // ที่ใกล้กลางจอก่อน
+const TMP=new THREE.Vector3(),TMP2=new THREE.Vector3();
+function setLine(F){const L=F.line.geometry.attributes.position;F.tip.getWorldPosition(TMP);const b=F.bob.visible?F.bob.position:TMP2.copy(TMP).add(new THREE.Vector3(0,-1.2,0));
+  for(let i=0;i<18;i++){const k=i/17,sag=Math.sin(k*Math.PI)*(F.bob.visible?Math.min(1.6,TMP.distanceTo(b)*0.08)*(F.tight?0.15:1):0);L.setXYZ(i,lerp(TMP.x,b.x,k),lerp(TMP.y,b.y,k)-sag,lerp(TMP.z,b.z,k))}L.needsUpdate=true}
+
+// ---------- คนดู ----------
+let P={};
+const SHIRTS=['#a85a4a','#4a6a8a','#8a7a4a','#6a4a7a','#4a7a6a','#9a6a3a'];
+function setPic(p,url){if(!url||p.picUrl===url)return;p.picUrl=url;const im=new Image();im.referrerPolicy='no-referrer';im.src=url;p.pic=im}
+function player(name,pic){let p=P[name];if(!p){p=P[name]={name,hearts:0,last:NOW,shirt:pick(SHIRTS),casts:0,best:null,bait:0};}setPic(p,pic);p.last=NOW;return p}
+const BAD=['ควย','เหี้ย','สัส','สัด','เย็ด','หี','แตด','ไอ้สัตว์','fuck','shit','dick','pussy','porn'];
+const clean=s=>!BAD.some(b=>String(s).toLowerCase().includes(b));
+const HELP=/เล่นยังไง|เล่นไง|เล่นยังงัย|ทำยังไง|ทำไง|ยังไงคะ|ยังไงครับ|วิธีเล่น|เล่นอย่างไร|how to play|ตกยังไง|ตกไง/i;
+
+// ---------- การตกปลา: เหวี่ยง > รอ > ปลากินเบ็ด > ดึงขึ้น > โชว์ > ปล่อยกลับ ----------
+let fishers=[],flying=[],splashes=[],stats={casts:0,catches:0,legends:0},bestToday=[],record={best:0};
+function freeSlot(p){const w=p&&!p.npc?vipWho():{};for(const k of ['give','catch'])if(w[k]===p&&!VIP[k].who)return VIP[k];
+  let s=SLOTS.find(x=>!x.who&&!x.vip)||SLOTS.find(x=>!x.who);if(s)return s;
+  // เต็ม: ให้คนที่ว่างนานสุด (ไม่ได้ตกอยู่) ลุกออก บอทลุกก่อน
+  const idle=fishers.filter(F=>F.st==='idle').sort((a,b)=>(a.p.npc?-1:0)-(b.p.npc?-1:0)||a.lastAct-b.lastAct)[0];if(!idle)return null;leave(idle);return SLOTS.find(x=>!x.who)}
+function seat(p){if(p.F&&fishers.includes(p.F))return p.F;const s=freeSlot(p);if(!s)return null;const m=makeFisher({shirt:p.npc?0x6a7a8a:undefined,band:p.npc?0x5a6a7a:undefined});
+  m.g.position.set(s.x,PIER.y+0.05,s.z);m.g.rotation.y=s.sx<0?-Math.PI/2:Math.PI/2;scene.add(m.g);scene.add(m.line);scene.add(m.bob);
+  const F={...m,p,slot:s,st:'idle',t:NOW,lastAct:NOW,pop:NOW,queue:0};s.who=F;p.F=F;fishers.push(F);crown(p);return F}
+function leave(F){if(F.p.caughtN){F.bucket.getWorldPosition(TMP);ring(TMP.x+F.slot.sx*3,TMP.z,1.2)}scene.remove(F.g);scene.remove(F.line);scene.remove(F.bob);F.line.geometry.dispose();F.slot.who=null;F.p.F=null;fishers=fishers.filter(x=>x!==F)}
+function cast(p,opt={}){const F=seat(p);if(!F)return false;F.lastAct=NOW;if(F.st!=='idle'){F.queue=Math.min(2,F.queue+1);if(opt.force!=null)F.force=Math.max(F.force??-1,opt.force);return true}
+  if(opt.force!=null)F.force=opt.force;F.st='cast';F.t=NOW;p.casts++;stats.casts++;
+  const s=F.slot;F.target=new THREE.Vector3(s.x+s.sx*rnd(6,9),0.12,s.z-rnd(1,4));wsfx('whoosh',p);return true}
+function biteTime(F){const h=F.p.hearts-(F.h0??F.p.hearts);return Math.max(1.2,(frenzyOn()?rnd(1.5,3):rnd(3.5,7))-Math.min(3,h*0.08))}
+function updFishers(dt){for(const F of fishers){const k=NOW-F.t,s=F.slot;F.tight=false;
+  if(F.st==='cast'){const a=Math.min(1,k/0.9);F.rod.rotation.x=a<0.35?lerp(0.95,0.2,a/0.35):lerp(0.2,1.15,(a-0.35)/0.65);
+    if(a>0.35){F.bob.visible=true;F.tip.getWorldPosition(TMP);const u=(a-0.35)/0.65;F.bob.position.lerpVectors(TMP,F.target,u);F.bob.position.y+=Math.sin(u*Math.PI)*3}
+    if(a>=1){F.st='wait';F.t=NOW;F.wait=biteTime(F);F.h0=F.p.hearts;ring(F.target.x,F.target.z,0.6);wsfx('plop',F.p)}}
+  else if(F.st==='wait'){F.bob.position.y=0.12+Math.sin(NOW*2.4+s.z)*0.05;F.rod.rotation.x=1.15+Math.sin(NOW*1.3+s.z)*0.03;
+    const h=F.p.hearts-F.h0;if(h>0){F.wait-=h*0.08;F.h0=F.p.hearts}if(k>F.wait){F.st='bite';F.t=NOW;wsfx('splash',F.p);ring(F.bob.position.x,F.bob.position.z,1.2);F.excl=NOW}}
+  else if(F.st==='bite'){F.bob.position.y=0.12-Math.abs(Math.sin(k*14))*0.32;F.rod.rotation.x=1.15+Math.sin(k*30)*0.05;if(k>0.9){F.st='reel';F.t=NOW;if(!F.p.npc&&performance.now()/1000-(wLast.reel||0)>0.8){wLast.reel=performance.now()/1000;sfx('freel',0.4)}F.catch=rollFish(F.min||0,F.force);F.force=undefined;F.min=0;startFly(F)}}
+  else if(F.st==='reel'){F.tight=true;F.rod.rotation.x=lerp(1.15,0.45,ease.out(Math.min(1,k/0.5)));if(k>0.5)F.bob.visible=false;if(k>1.1){F.st='show';F.t=NOW}}
+  else if(F.st==='show'){F.rod.rotation.x=0.45+Math.sin(NOW*3)*0.02;if(k>(F.showFor||2.6)){F.st='idle';F.t=NOW;F.rod.rotation.x=0.95;F.lastAct=NOW;if(F.queue>0){F.queue--;cast(F.p)}}}
+  else{F.rod.rotation.x=lerp(F.rod.rotation.x,0.95,dt*3)}
+  setLine(F);
+  // ตัวเด้งตอนเพิ่งนั่ง
+  const pk=NOW-F.pop;F.g.scale.setScalar(FS*(pk<0.4?ease.back(pk/0.4):1));const bp=NOW-(F.bucketPop??-9);F.bucket.scale.setScalar(bp<0.35?1+Math.sin(bp/0.35*Math.PI)*0.45:1);}
+  // คนที่ไม่ได้เล่น 2 นาที ลุกออกจากท่า (บอท 40 วิ)
+  for(const F of fishers.slice())if(F.st==='idle'&&NOW-F.lastAct>(F.p.npc?40:F.p.coins?300:120))leave(F);
+  for(const F of fishers)if(F.crown){F.crown.rotation.y+=dt*0.8;F.crown.children.forEach(o=>{if(o.userData.orbit!=null){const a=NOW*2.2+o.userData.orbit*2.094;o.position.set(Math.cos(a)*0.55,0.15+Math.sin(NOW*3+o.userData.orbit)*0.12,Math.sin(a)*0.55)}})}}
+// ปลาพุ่งจากทุ่น ขึ้นมาค้างกลางอากาศเหนือคนตก (โชว์) แล้วกระโดดกลับลงน้ำ
+function startFly(F){const c=F.catch,m=fishMesh(c.f,F.slot.sx<0),sz=clamp(0.75+Math.log10(c.kg+1)*0.9,0.7,3.2)*(c.r===3?1.25:1);fishSize(m,sz*2.4);scene.add(m);
+  const gl=glowSprite(new THREE.Color(RAR[c.r].c),sz*[1.6,2.2,2.8,3.4][c.r],[0.12,0.22,0.32,0.45][c.r]);gl.layers.set(1);scene.add(gl);
+  const s=F.slot,hold=new THREE.Vector3(s.x+s.sx*4.2,PIER.y+6.5+sz*0.6,s.z+0.6),from=F.bob.position.clone(),back=new THREE.Vector3(s.x+s.sx*rnd(8,14),0,s.z+rnd(-4,4));
+  const showFor=[1.3,1.7,2.4,4.6][c.r];F.showFor=showFor+1.1;flying.push({F,m,gl,c,from,hold,back,t:NOW,showFor,sz});
+  caught(F,c)}
+function updFlying(dt){for(const o of flying){const k=NOW-o.t;let p;
+  const fl=o.m.userData.flip||1;if(k<0.6){const u=ease.out(k/0.6);p=TMP.lerpVectors(o.from,o.hold,u);p.y+=Math.sin(u*Math.PI)*2;o.m.material.rotation=lerp(1.1,0,u)*fl;}
+  else if(k<0.6+o.showFor){p=TMP.copy(o.hold);p.y+=Math.sin(NOW*3)*0.15;o.m.material.rotation=Math.sin(NOW*9)*0.1*fl}
+  else if(o.F&&fishers.includes(o.F)){const u=Math.min(1,(k-0.6-o.showFor)/0.45),e=u*u;if(o.sx0==null){o.sx0=o.m.scale.x;o.sy0=o.m.scale.y}
+    o.F.bucket.getWorldPosition(TMP2);TMP2.y+=0.6;p=TMP.lerpVectors(o.hold,TMP2,e);p.y+=Math.sin(u*Math.PI)*1.2;const sc=lerp(1,0.25,e);o.m.scale.set(o.sx0*sc,o.sy0*sc,1);o.m.material.rotation=lerp(0,-0.9,e)*fl;
+    if(u>=1&&!o.done){o.done=true;const pl=o.F.p;pl.caughtN=(pl.caughtN||0)+1;o.F.bucketPop=NOW;bucketBurst(o.F,o.c.r)}}
+  else{const u=Math.min(1,(k-0.6-o.showFor)/0.9);p=TMP.lerpVectors(o.hold,o.back,u);p.y+=Math.sin(u*Math.PI)*3;o.m.material.rotation=lerp(0.3,-1.3,u)*fl;if(u>=1&&!o.done){o.done=true;ring(o.back.x,o.back.z,1.4)}}
+  o.m.position.copy(p);o.gl.position.copy(p);if(o.c.r<3)o.m.material.color.setScalar(lerp(0.62,1,clamp(DAY.cur.sun??1,0,1)));o.gl.material.opacity=[0.12,0.22,0.32,0.45][o.c.r]*(0.8+0.2*Math.sin(NOW*5))}
+  for(const o of flying.filter(o=>o.done)){scene.remove(o.m);scene.remove(o.gl);o.m.material.dispose();o.gl.material.dispose()}flying=flying.filter(o=>!o.done)}
+function bucketBurst(F,rar){F.bucket.getWorldPosition(TMP);const col=new THREE.Color(RAR[rar].c).getHex(),n=8+rar*6;
+  for(let i=0;i<n;i++){const sp=glowSprite(i%2?col:0xfff0c0,rnd(0.35,0.7),1);sp.position.set(TMP.x,TMP.y+0.9,TMP.z);sp.layers.set(1);scene.add(sp);const a=rnd(0,6.283),v=rnd(2,5);sparks3.push({sp,vx:Math.cos(a)*v*0.5,vy:rnd(4,8),vz:Math.sin(a)*v*0.5,t:NOW})}}
+// วงน้ำกระเพื่อม
+const ringMat=new THREE.MeshBasicMaterial({color:0xfff2e0,transparent:true,opacity:.7,depthWrite:false,side:THREE.DoubleSide});
+const ringG=new THREE.RingGeometry(0.85,1,40);
+function ring(x,z,s){for(let i=0;i<3;i++){const m=new THREE.Mesh(ringG,ringMat.clone());m.rotation.x=-Math.PI/2;m.position.set(x,0.08,z);m.layers.set(1);scene.add(m);splashes.push({m,t:NOW+i*0.18,s})}}
+function updRings(){for(const r of splashes){const k=NOW-r.t;if(k<0){r.m.visible=false;continue}r.m.visible=true;r.m.scale.setScalar(r.s*(0.3+k*2.4));r.m.material.opacity=Math.max(0,0.7*(1-k/1.3))}
+  for(const r of splashes.filter(r=>NOW-r.t>1.3)){scene.remove(r.m);r.m.material.dispose()}splashes=splashes.filter(r=>NOW-r.t<=1.3)}
+// ปลาว่ายกระโดดเองกลางบึงเป็นระยะ ให้น้ำดูมีชีวิต (ไม่นับเป็นของใคร)
+let jumpT=3;function ambientJump(dt){if((jumpT-=dt)>0)return;jumpT=frenzyOn()?rnd(0.3,0.8):rnd(2.5,6);const f=frenzyOn()?FISH.find(x=>x.n==='ปลาตะเพียนทอง'):pick(FISH.filter(x=>x.r<2)),dir=rnd(-1,1)>0?1:-1,m=fishMesh(f,dir<0);fishSize(m,rnd(1.8,2.8));scene.add(m);
+  const a=new THREE.Vector3(rnd(-40,40),0,rnd(-70,0)),b=a.clone().add(new THREE.Vector3(dir*rnd(3,6),0,rnd(-1,1)));flying.push({F:null,m,gl:glowSprite(0xffffff,0.01,0),c:{r:0},from:a,hold:a,back:b,t:NOW-0.6,showFor:0,sz:1})}
+
+// ---------- ผลการตก: การ์ดใหญ่ กระดานปลาใหญ่สุด แถบล่าสุด ----------
+let cards=[],mini=[],banners=[],bubbles=[],toasts=[];
+function caught(F,c){const p=F.p;stats.catches++;if(c.r===3)stats.legends++;const g=Math.round(c.kg*1000);
+  if(!p.npc){if(!p.best||c.kg>p.best.kg)p.best={...c};bestToday=Object.values(P).filter(x=>x.best&&!x.npc).sort((a,b)=>b.best.kg-a.best.kg).slice(0,3);
+    if(g>record.best){const old=record.best;record={best:g,name:p.name,fish:c.f.n};if(old)banner('สถิติใหม่ของบึง!','#ffd04a',`${short(p.name,10)} ${c.f.n} ${c.kg} กก.`);fetch('/record/fish',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({best:g})}).catch(()=>{})}}
+  // การ์ดเล็กเรียงทางขวา: คนจริงได้ทุกครั้ง (ใหม่อยู่บน เก่าเลื่อนลงแล้วหายไป) บอทขึ้นการ์ดเฉพาะตอนไม่มีคนเล่นจริง
+  if(!p.npc||!realActive()){mini.unshift({p,c,t:NOW,y:null});if(mini.length>8)mini.length=8}
+  // การ์ดใหญ่กลางจอ เฉพาะปลาตำนาน พร้อมกล้องซูม
+  if(c.r===3&&!p.npc){cards.push({p,c,t:Math.max(NOW+0.5,...cards.map(x=>x.t+x.d)),d:6});honorOf(F)}
+  afterCatchSay(p,c)}
+function afterCatchSay(p,c){if(p.npc)return;
+  if(c.r===3){sfx('flegfan',1);sfxAt('clapb',0.8,1.4,2);duck(5.5);mcSay('ปลาตำนาน! คุณ{n}ได้'+c.f.n+' หนัก '+c.kg+' กิโลค่ะ ขอเสียงปรบมือหน่อยค่ะ',{n:p.name,f:'มีคนได้ปลาตำนานแล้วค่ะ ขอเสียงปรบมือหน่อยค่ะ',pri:1,chime:1,ttl:30})}
+  else if(c.r===2){sfxAt('frare',0.95,0,0.5);sfxAt('claps',0.6,0.7,2);duck(2.5);mcSay('โอ้โห คุณ{n}ได้'+c.f.n+'ตัวใหญ่ หนัก '+c.kg+' กิโลค่ะ',{n:p.name,f:'มีคนได้ปลาหายากแล้วค่ะ',ttl:18})}
+  else{sfx('fcatch',c.r?0.7:0.45);if(p.casts===1)mcSay(pick(['คุณ{n}ได้ปลาตัวแรกแล้วค่ะ พิมพ์อีกได้เรื่อยๆ นะคะ','ยินดีด้วยค่ะคุณ{n} ตัวแรกมาแล้ว พิมพ์อีกเพื่อลุ้นตัวใหญ่ค่ะ']),{n:p.name,f:'มีคนได้ปลาตัวแรกแล้วค่ะ',ttl:15})}}
+function banner(s,col,sub=''){banners.push({s,col,sub,t:Math.max(NOW,...banners.map(b=>b.t+2.6))})}
+
+// ---------- ปลาตำนานโผล่ (ทุก CFG.legend นาที): ใครพิมพ์ในช่วงนับถอยหลังได้ลุ้น ----------
+const EV={next:90,st:'off',t:0,who:new Map(),win:null};
+function legendStart(){if(EV.st!=='off')return;EV.st='warn';EV.t=NOW;EV.who=new Map();sfx('flegend',0.9);mcSay('ปลาตำนานโผล่แล้วค่ะ! พิมพ์อะไรก็ได้ภายในสิบห้าวินาที เพื่อลุ้นตกปลาตำนานค่ะ',{pri:1,chime:1,ttl:20})}
+function legendTick(){if(EV.st==='off'){if(NOW>EV.next&&(realActive()||Q.has('test')))legendStart();return}
+  const k=NOW-EV.t;lake.uniforms.glow.value=EV.st==='open'||EV.st==='warn'?clamp(k/2,0,1):Math.max(0,lake.uniforms.glow.value-0.01);
+  if(EV.st==='warn'&&k>2.5){EV.st='open';EV.t=NOW}
+  else if(EV.st==='open'&&k>15){EV.st='draw';EV.t=NOW;const list=[...EV.who.entries()];
+    if(!list.length){banner('ปลาตำนานว่ายหนีไปแล้ว','#9ab0d0','รอบหน้าพิมพ์ให้ทันนะ');EV.st='off';EV.next=NOW+CFG.legend*60;return}
+    let s=list.reduce((a,[,w])=>a+w,0),u=Math.random()*s,win=list[0][0];for(const [p,w] of list){if((u-=w)<0){win=p;break}}EV.win=win;
+    cast(win,{force:3});for(const [p] of list)if(p!==win)cast(p,{force:Math.random()<0.4?2:1});banner(`${short(win.name,12)} ได้เบ็ดปลาตำนาน!`,'#ffc83a',`ผู้ร่วมลุ้น ${list.length} คน ได้ปลาหายากกว่าปกติทุกคน`)}
+  else if(EV.st==='draw'&&k>8){EV.st='off';EV.next=NOW+CFG.legend*60*rnd(0.85,1.15)}}
+const legShadow=(()=>{const g2=new THREE.Group(),sh=new THREE.Mesh(new THREE.PlaneGeometry(14,5),new THREE.MeshBasicMaterial({map:canvasTex(256,96,(x,w,h)=>{const gr=x.createRadialGradient(w*0.45,h/2,4,w*0.45,h/2,w*0.45);gr.addColorStop(0,'rgba(255,220,120,1)');gr.addColorStop(1,'rgba(255,200,80,0)');x.fillStyle=gr;x.beginPath();x.ellipse(w*0.45,h/2,w*0.42,h*0.36,0,0,7);x.fill();x.beginPath();x.moveTo(w*0.82,h/2);x.lineTo(w,h*0.12);x.lineTo(w,h*0.88);x.fill()}),transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false}));sh.rotation.x=-Math.PI/2;sh.position.y=0.1;sh.layers.set(1);g2.add(sh);scene.add(g2);return {g:g2,sh}})();
+function updLegShadow(){const on=EV.st==='warn'||EV.st==='open',m=legShadow.sh.material;m.opacity=lerp(m.opacity,on?0.8:0,0.04);if(m.opacity<0.01)return;const a=NOW*0.5;legShadow.g.position.set(Math.cos(a)*16,0,-14+Math.sin(a)*9);legShadow.g.rotation.y=-a+Math.PI}
+// หัวใจรวมครบเป้า = ปลาขึ้นฝูง 30 วิ: กินเบ็ดเร็ว ปลาทองกระโดดทั่วบึง
+let liveHearts=0,msIdx=0,frenzyUntil=0;const MS_G=i=>[200,500,1000,1800,3000][i]??3000+(i-4)*1500;
+const frenzyOn=()=>NOW<frenzyUntil;
+function frenzy(sec=30){frenzyUntil=Math.max(frenzyUntil,NOW)+sec;banner('ปลาขึ้นฝูง!','#ffd04a','30 วินาที ปลากินเบ็ดเร็ว พิมพ์รัวๆ เลย');sfx('win',0.7);mcSay('ปลาขึ้นฝูงแล้วค่ะ! สามสิบวินาทีนี้ปลากินเบ็ดไวมาก พิมพ์รัวๆ ได้เลยค่ะ',{pri:1,chime:1,ttl:20})}
+
+// หัวใจครบเป้า: จอมืดลง หัวใจยักษ์เต้นกลางจอ ฝนหัวใจ ปลาคาร์ปจันทรายักษ์กระโดดข้ามท่า บึงเรืองแสงชมพู
+// ทุกคนบนท่าได้เหยื่อพิเศษเบ็ดถัดไป แล้วเข้าช่วงปลาขึ้นฝูง
+const HS={t:-99,goal:0,koi:null};let heartRain=[];
+function heartGoal(goal){HS.t=NOW;HS.goal=goal;for(let i=0;i<90;i++)heartRain.push({x:rnd(0,W),y:H+rnd(0,600),vy:rnd(300,620),s:rnd(18,44),sw:rnd(0,6),c:pick(['#ff5a7a','#ff8aa8','#ffb0c8','#ff3a6a','#ffd0e0']),t:NOW});
+  for(const F of fishers)if(!F.p.npc)F.min=Math.max(F.min||0,1);sfx('hgoal',1);sfxAt('clapb',0.85,0.9,2);duck(5.5);
+  mcSay('หัวใจครบ '+goal+' ดวงแล้วค่ะ! ขอบคุณทุกคนมากๆ เลยนะคะ ทุกคนบนท่าได้เหยื่อพิเศษ แล้วปลากำลังจะขึ้นฝูงค่ะ',{pri:1,chime:1,ttl:25});
+  const f=FISH.find(x=>x.n==='ปลาคาร์ปจันทรา'),m=fishMesh(f,false);fishSize(m,16);m.material.color.setRGB(1,0.85,0.95);scene.add(m);HS.koi=m;setTimeout(()=>frenzy(),5200)}
+function updHeartShow(dt){const k=NOW-HS.t;if(k<5)lake.uniforms.glow.value=Math.max(lake.uniforms.glow.value,Math.sin(clamp(k/5,0,1)*Math.PI)*0.9);else if(EV.st==='off')lake.uniforms.glow.value=Math.max(0,lake.uniforms.glow.value-0.01);
+  if(HS.koi){const u=clamp((k-0.8)/3.2,0,1);HS.koi.position.set(lerp(-60,60,u),PIER.y+2+Math.sin(u*Math.PI)*26,-6);HS.koi.material.rotation=lerp(0.6,-0.6,u);
+    if(u>0&&u<1&&Math.random()<0.6){const sp=glowSprite(pick([0xffb0d0,0xffffff,0xffd0a0]),rnd(0.8,1.8),0.9);sp.position.copy(HS.koi.position);sp.layers.set(1);scene.add(sp);sparks3.push({sp,vx:rnd(-2,2),vy:rnd(-2,2),vz:rnd(-2,2),t:NOW})}
+    if(u>=1){ring(60,-6,4);ring(-60,-6,4);scene.remove(HS.koi);HS.koi.material.dispose();HS.koi=null}}}
+function drawHeartShow(){const k=NOW-HS.t;
+  if(heartRain.length){const dt=1/60;for(const h of heartRain){h.y-=h.vy*dt;g.globalAlpha=clamp((4.5-(NOW-h.t))*1.5,0,1);heart(h.x+Math.sin(NOW*3+h.sw)*20,h.y,h.s,h.c)}g.globalAlpha=1;heartRain=heartRain.filter(h=>h.y>-60&&NOW-h.t<4.5)}
+  if(k<0||k>4.6)return;const a=clamp(Math.min(k*3,(4.6-k)*2.5),0,1),pulse=1+0.12*Math.abs(Math.sin(k*5));
+  g.globalAlpha=a;g.fillStyle='rgba(40,6,24,.45)';g.fillRect(0,0,W,H);g.save();g.translate(540,640);g.scale(pulse,pulse);
+  const hg=g.createRadialGradient(0,0,20,0,0,320);hg.addColorStop(0,'rgba(255,120,160,.55)');hg.addColorStop(1,'rgba(255,120,160,0)');g.fillStyle=hg;g.fillRect(-330,-330,660,660);
+  g.save();g.shadowColor='#ff6a9a';g.shadowBlur=40;heart(0,40,250,'#ff4a78');g.restore();g.restore();
+  txt('หัวใจครบ '+HS.goal.toLocaleString()+' ดวง!',540,640,64,'#ffffff','center',700,'rgba(120,10,50,.9)');txt('ขอบคุณทุกคน ทุกคนได้เหยื่อพิเศษ',540,712,34,'#ffe0ea','center',700,'rgba(120,10,50,.9)');g.globalAlpha=1}
+function drawHeartFx(){heartFx=heartFx.filter(h=>NOW-h.t<1.4&&fishers.includes(h.F));for(const h of heartFx){const k=NOW-h.t;if(k<0)continue;const sp=screenOf(h.F,2.6);if(!sp.ok)continue;g.globalAlpha=clamp(1.4-k,0,1);heart(sp.x+h.dx+Math.sin(k*6)*10,sp.y-60-k*120,20+k*10,h.c)}g.globalAlpha=1}
+// ---------- รับเหตุการณ์ ----------
+let lastReal=-99;
+function comment(name,text,pic){const p=player(name,pic);lastReal=NOW;const t=String(text||'').replace(/\s+/g,' ').trim();
+  if(EV.st==='open'||EV.st==='warn')EV.who.set(p,(EV.who.get(p)||0)+1+Math.min(4,(p.hearts-(p.evH??p.hearts))/20));
+  if(HELP.test(t)&&NOW-(helpT||-99)>12){helpT=NOW;helpShow=NOW;mcSay('พิมพ์อะไรก็ได้ในแชทค่ะ ตัวละครชื่อคุณจะนั่งตกปลาให้ทันที กดหัวใจปลาจะกินเบ็ดเร็วขึ้นค่ะ',{pri:1,ttl:20})}
+  if(t&&clean(t)&&t.length>=1)bubbles.push({p,s:t,t:NOW});const first=!p.F,firstEver=!p.casts;if(cast(p)&&firstEver)p.firstCard=true;if(first)welcomeFirst(p)}
+let helpT=-99,helpShow=-99;
+let heartFx=[];
+function like(name,n,pic){const p=player(name,pic);p.hearts+=n;liveHearts+=n;if(p.F&&heartFx.filter(h=>h.F===p.F).length<8)for(let i=0;i<Math.min(4,n);i++)heartFx.push({F:p.F,t:NOW+i*0.08,dx:rnd(-30,30),c:pick(['#ff5a7a','#ff8aa8','#ff3a6a'])});if(!p.F&&p.hearts>=5&&NOW-(p.autoT||-99)>20){p.autoT=NOW;cast(p);welcomeFirst(p)}
+  while(liveHearts>=MS_G(msIdx)){heartGoal(MS_G(msIdx));msIdx++}}
+const GIMG={};
+function giftImg(id,url){if(!id)return null;if(GIMG[id])return GIMG[id];const im=new Image();im.referrerPolicy='no-referrer';im.onerror=()=>{if(url&&im.src!==url)im.src=url};im.src=`/gifts/${id}.png`;return GIMG[id]=im}
+const TIERS=[{id:'5655',c:1,n:'เหยื่อทอง'},{id:'5879',c:30,n:'ปลาหายาก'},{id:'5660',c:100,n:'ปลาตำนาน'},{id:'6267',c:299,n:'ฝูงปลาทอง'}];TIERS.forEach(t=>giftImg(t.id));
+// ทุกของขวัญได้ฉลอง ไม่ว่าเล็กหรือใหญ่: แถบทองขอบคุณ โฆษกเรียกชื่อ ประกายทองจากตัวละคร มงกุฎ และชื่อขึ้นกระดานผู้สนับสนุน
+// 10 เหรียญขึ้นไป เพิ่มพลุกระดาษ + กล้องซูม 3 วิ / 100 ขึ้นไป กล้องซูมเต็ม + ฝูงปลาทอง
+const GNAME={'5655':'กุหลาบ','5879':'โดนัท','5660':'มือหัวใจ','6267':'คอร์กี้'};
+const THNAME={rose:'กุหลาบ','heart me':'หัวใจ','finger heart':'มินิฮาร์ท',tiktok:'ทิกต็อก',gg:'GG','ice cream cone':'ไอศกรีม',doughnut:'โดนัท','hand heart':'มือหัวใจ',corgi:'คอร์กี้',perfume:'น้ำหอม',
+  'love you':'รักนะ',sunglasses:'แว่นกันแดด',galaxy:'กาแล็กซี',lion:'สิงโต',universe:'จักรวาล',confetti:'พลุกระดาษ','money gun':'ปืนเงิน',swan:'หงส์',train:'รถไฟ',fireworks:'พลุ',
+  'paper crane':'นกกระเรียนกระดาษ','little crown':'มงกุฎน้อย','hi bear':'หมีทักทาย','sports car':'รถสปอร์ต',motorcycle:'มอเตอร์ไซค์',rainbow:'สายรุ้ง',bouquet:'ช่อดอกไม้',cake:'เค้ก',
+  panda:'แพนด้า',mic:'ไมค์',hearts:'หัวใจ',heart:'หัวใจ','little hippo':'ฮิปโปน้อย','love in scent':'กลิ่นรัก',cap:'หมวก','hat and mustache':'หมวกกับหนวด',gamepad:'จอยเกม',
+  'thumbs up':'ยกนิ้ว','friendship necklace':'สร้อยมิตรภาพ','heart puff':'หัวใจฟู',rosa:'กุหลาบช่อ','super gg':'ซูเปอร์ GG',whale:'วาฬ','whale diving':'วาฬดำน้ำ',interstellar:'อวกาศ',falcon:'เหยี่ยว',
+  'lion king':'ราชสีห์',castle:'ปราสาท',airplane:'เครื่องบิน',jet:'เครื่องบินเจ็ต',yacht:'เรือยอชต์','fluffy heart':'หัวใจฟู',kiss:'จุ๊บ','team bracelet':'สร้อยข้อมือทีม',mishka:'หมีมิชก้า',coral:'ปะการัง'};
+let thanks=[],supporters=new Map(),confetti=[],sparks3=[];
+function gift(name,coins,giftId,img,pic,gname,cnt=1){const p=player(name,pic);p.hearts+=coins*5;lastReal=NOW;greeted.add(name);
+  const icon=giftId?giftImg(giftId,img):null,gn=String(THNAME[String(gname||'').toLowerCase()]||gname||GNAME[giftId]||'ของขวัญ').slice(0,16);p.coins=(p.coins||0)+coins;
+  if(coins>=299){cast(p,{force:3});frenzy(45)}else if(coins>=100)cast(p,{force:3});else if(coins>=30)cast(p,{force:2});else cast(p,{force:1});
+  if(coins>=299){sfx('gmega',1);sfxAt('coins',0.7,0.4);sfxAt('clapb',0.85,1.2,2);duck(6.5)}
+  else if(coins>=100){sfx('gbig',1);sfxAt('coins',0.6,0.3);sfxAt('clapb',0.8,0.9,2);duck(5)}
+  else if(coins>=10){sfxAt('gmid',0.9,0,0.4);sfxAt('claps',0.7,0.6,1.5);duck(3)}
+  else{sfxAt('gsmall',0.9,0,0.3);sfxAt('claps',0.55,0.4,2.5)}
+  const sp=supporters.get(p)||{coins:0};sp.coins+=coins;sp.icon=icon||sp.icon;sp.t=NOW;supporters.set(p,sp);
+  const same=thanks.find(x=>x.p===p&&x.gn===gn&&NOW-x.at<8);
+  if(same){same.count+=cnt;same.coins+=coins;same.at=NOW;if(NOW>=same.t)same.d=Math.max(same.d,NOW-same.t+1.6)}
+  else{const wait=thanks.filter(x=>x.t>NOW).length,d=coins>=299?6:coins>=100?4.8:wait>2?1.6:coins>=10?3.4:2.6;thanks.push({p,gn,icon,count:cnt,coins,at:NOW,t:Math.max(NOW,...thanks.map(x=>x.t+x.d)),d})}
+  crown(p);giftBurst(p,coins);if(coins>=100)coinBurst(coins>=299?140:80);if(coins>=10){confettiBurst(coins>=100?170:80);if(p.F)honorOf(p.F,coins>=100?6.5:3.2)}
+  if(NOW-(p.thankT||-99)>6){p.thankT=NOW;const big=coins>=100,mid=coins>=10;
+    mcSay(big?pick(['ขอเสียงปรบมือดังๆ ให้คุณ{n}ด้วยค่ะ ขอบคุณมากๆ เลยนะคะ เบ็ดนี้ได้ปลาตำนานแน่นอนค่ะ','ว้าว ขอบคุณคุณ{n}มากเลยค่ะ ใจดีสุดๆ ปลาตำนานรออยู่แล้วค่ะ'])
+      :mid?pick(['ขอบคุณคุณ{n}มากเลยค่ะ ได้มงกุฎทองไปเลยนะคะ','ขอบคุณคุณ{n}ค่ะ น่ารักมากเลย เบ็ดนี้ได้ปลาดีแน่นอนค่ะ'])
+      :pick(['ขอบคุณคุณ{n}สำหรับของขวัญนะคะ','ขอบคุณคุณ{n}มากเลยค่ะ ได้มงกุฎไปเลยนะคะ','คุณ{n}ส่งของขวัญมาค่ะ ขอบคุณมากนะคะ']),
+      {n:name,f:'ขอบคุณสำหรับของขวัญมากเลยค่ะ',pri:1,ttl:25})}}
+// ประกายทองพุ่งจากตัวละคร (สามมิติ)
+function giftBurst(p,coins){const F=p.F;if(!F)return;F.g.getWorldPosition(TMP);const n=coins>=100?44:coins>=10?28:16;
+  for(let i=0;i<n;i++){const sp=glowSprite(pick([0xffd060,0xfff0b0,0xffa040]),rnd(0.5,1.1),1);sp.position.set(TMP.x,TMP.y+3,TMP.z);sp.layers.set(1);scene.add(sp);
+    const a=rnd(0,6.283),v=rnd(3,9)*(coins>=100?1.4:1);sparks3.push({sp,vx:Math.cos(a)*v*0.6,vy:rnd(6,13),vz:Math.sin(a)*v*0.6,t:NOW})}}
+function updSparks3(dt){for(const o of sparks3){o.vy-=14*dt;o.sp.position.x+=o.vx*dt;o.sp.position.y+=o.vy*dt;o.sp.position.z+=o.vz*dt;o.sp.material.opacity=Math.max(0,1-(NOW-o.t)/1.5)}
+  for(const o of sparks3.filter(o=>NOW-o.t>1.5)){scene.remove(o.sp);o.sp.material.dispose()}sparks3=sparks3.filter(o=>NOW-o.t<=1.5)}
+// พลุกระดาษบนจอ (สองมิติ)
+function confettiBurst(n){for(let i=0;i<n;i++)confetti.push({x:rnd(0,W),y:rnd(-200,-10),vx:rnd(-80,80),vy:rnd(250,520),r:rnd(0,6),vr:rnd(-8,8),c:pick(['#ffd04a','#ff6a8a','#7fd8ff','#9fe08a','#ffffff','#c080ff']),w:rnd(10,18),t:NOW})}
+const followDone=new Set();
+function follow(name,pic,repeat){const p=player(name,pic);if(repeat||followDone.has(name))return;followDone.add(name);cast(p,{force:1});mcSay('ขอบคุณคุณ{n}ที่กดติดตามค่ะ เบ็ดนี้ได้ปลาไม่ธรรมดาค่ะ',{n:name,f:'ขอบคุณที่กดติดตามค่ะ',pri:1,ttl:25});banner(`ขอบคุณ ${short(name,12)} ที่กดติดตาม`,'#f0c86a','รับเหยื่อพิเศษ 1 เบ็ด')}
+
+// ---------- เสียง ----------
+const SND={ctx:null,buf:{},last:{}};let voices=0,PRESIM=false;
+function sndInit(){try{SND.ctx=new (window.AudioContext||window.webkitAudioContext)()}catch(e){return}const c=SND.ctx;SND.master=c.createGain();SND.master.gain.value=0.9;SND.master.connect(c.destination);
+  SND.bus=c.createGain();const comp=c.createDynamicsCompressor();comp.threshold.value=-18;comp.ratio.value=6;SND.bus.connect(comp).connect(SND.master);
+  fetch('/sounds').then(r=>r.json()).then(d=>{Object.keys(d.list||{}).forEach(k=>{if(!/^(gift\d?|levelup|honor|win|bgm_fish|fsplash|fplop|fcast|freel|fcatch|flegend|claps|clapb|frare|flegfan|gsmall|gmid|gbig|gmega|coins|hgoal|vip)$/.test(k))return;
+    fetch(`/sfx/${k}_${(d.choice||{})[k]||'a'}.mp3`).then(r=>r.ok?r.arrayBuffer():Promise.reject()).then(b=>c.decodeAudioData(b)).then(a=>{SND.buf[k]=a}).catch(()=>{})})}).catch(()=>{});
+  // เสียงน้ำสังเคราะห์: นอยส์ผ่านฟิลเตอร์ ไม่ต้องมีไฟล์
+  const n=c.createBuffer(1,c.sampleRate*1.2,c.sampleRate),d=n.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,2.2);SND.noise=n;
+  const resume=()=>{if(SND.ctx.state!=='running')SND.ctx.resume()};addEventListener('pointerdown',resume);addEventListener('keydown',resume)}
+function playBuf(b,k,vol,rate){const c=SND.ctx;if(!c||!b||c.state!=='running'||PRESIM)return;const now=performance.now()/1000;if(SND.last[k]&&now-SND.last[k]<0.12)return;if(voices>12)return;SND.last[k]=now;
+  const s=c.createBufferSource();s.buffer=b;s.playbackRate.value=rate;const gn=c.createGain();gn.gain.value=vol;s.connect(gn).connect(SND.bus);voices++;s.onended=()=>voices--;s.start()}
+function sfx(k,vol=1){playBuf(SND.buf[k],k,vol,rnd(0.95,1.08))}
+const gapLast={};function sfxAt(k,vol,delay=0,gap=0){setTimeout(()=>{const t=performance.now()/1000;if(gap&&t-(gapLast[k]||0)<gap)return;gapLast[k]=t;sfx(k,vol)},delay*1000)}
+function duck(sec){const c=SND.ctx;if(!c||!MUS.bus)return;MUS.bus.gain.setTargetAtTime(MUS.vol*0.3,c.currentTime,0.08);clearTimeout(duck.t);duck.t=setTimeout(()=>{if(MUS.bus)MUS.bus.gain.setTargetAtTime(MUS.vol,SND.ctx.currentTime,0.6)},sec*1000)}
+const SFXF={whoosh:'fcast',plop:'fplop',splash:'fsplash'};
+const WGAP={whoosh:0.7,plop:0.9,splash:0.45},wLast={};
+// who = คนตก (บอทเงียบ) เสียงเดิมห่างกันอย่างน้อย WGAP วินาที ความดังลดตามจำนวนคนบนท่า
+function wsfx(k,who){if(who&&who.npc)return;const now=performance.now()/1000;if(now-(wLast[k]||0)<WGAP[k])return;wLast[k]=now;const n=fishers.filter(F=>!F.p.npc).length,v=1/Math.sqrt(Math.max(1,n/2));const fk=SFXF[k];
+  if(fk&&SND.buf[fk])return sfx(fk,(k==='whoosh'?0.45:k==='plop'?0.6:0.75)*v);sfx2synth(k)}
+function sfx2(k){const fk=SFXF[k];if(fk&&SND.buf[fk])return sfx(fk,k==='whoosh'?0.55:0.8);sfx2synth(k)}
+function sfx2synth(k){const c=SND.ctx;if(!c||c.state!=='running'||PRESIM||voices>12)return;const t=c.currentTime,s=c.createBufferSource(),f=c.createBiquadFilter(),gn=c.createGain();s.buffer=SND.noise;
+  if(k==='splash'){f.type='bandpass';f.frequency.setValueAtTime(1800,t);f.frequency.exponentialRampToValueAtTime(500,t+0.5);gn.gain.setValueAtTime(0.5,t);gn.gain.exponentialRampToValueAtTime(0.001,t+0.7)}
+  else if(k==='plop'){f.type='lowpass';f.frequency.setValueAtTime(900,t);gn.gain.setValueAtTime(0.35,t);gn.gain.exponentialRampToValueAtTime(0.001,t+0.25);const o=c.createOscillator(),og=c.createGain();o.frequency.setValueAtTime(420,t);o.frequency.exponentialRampToValueAtTime(140,t+0.12);og.gain.setValueAtTime(0.25,t);og.gain.exponentialRampToValueAtTime(0.001,t+0.14);o.connect(og).connect(SND.bus);o.start(t);o.stop(t+0.15)}
+  else{f.type='highpass';f.frequency.setValueAtTime(2500,t);gn.gain.setValueAtTime(0.0001,t);gn.gain.linearRampToValueAtTime(0.22,t+0.12);gn.gain.exponentialRampToValueAtTime(0.001,t+0.35)}
+  s.connect(f).connect(gn).connect(SND.bus);voices++;s.onended=()=>voices--;s.start(t);s.stop(t+0.8)}
+const MUS={bus:null,next:0,vol:0.45};
+function musicTick(){const c=SND.ctx,b=SND.buf.bgm_fish;if(!c||c.state!=='running'||!b)return;if(!MUS.bus){MUS.bus=c.createGain();MUS.bus.gain.value=MUS.vol;MUS.bus.connect(SND.master)}
+  const now=c.currentTime,X=4;if(now<MUS.next)return;const src=c.createBufferSource(),gn=c.createGain();src.buffer=b;gn.gain.setValueAtTime(0.0001,now);gn.gain.linearRampToValueAtTime(1,now+X);gn.gain.setValueAtTime(1,now+b.duration-X);gn.gain.linearRampToValueAtTime(0.0001,now+b.duration);
+  src.connect(gn).connect(MUS.bus);src.start(now);MUS.next=now+b.duration-X}
+// ---------- โฆษกท่าน้ำ (เสียงเดียวกับโคม สร้างที่ server /mc) ----------
+const MC={q:[],busy:false,lastEnd:-99,idleT:8,recent:[],pa:null,n:0};
+const MC_IDLE=['พิมพ์อะไรก็ได้ในแชทค่ะ ตัวละครชื่อคุณจะนั่งตกปลาให้ทันที','ใครยังไม่ได้ตก พิมพ์มาสักคำค่ะ จะพิมพ์ว่าตกปลา หรือพิมพ์ชื่อตัวเองก็ได้',
+  'กดหัวใจรัวๆ ปลาจะกินเบ็ดเร็วขึ้นนะคะ','พิมพ์ได้เรื่อยๆ นะคะ พิมพ์หนึ่งครั้งได้เหวี่ยงเบ็ดหนึ่งครั้ง ลุ้นตัวใหญ่กว่าเดิม','ปลาที่ตกได้อยู่ในถังน้ำข้างตัวนะคะ ลุกจากท่าเมื่อไหร่ เราปล่อยคืนบึงทุกตัวค่ะ',
+  'ใครได้ปลาตัวใหญ่สุด ขึ้นกระดานด้านซ้ายมือเลยค่ะ','หัวใจรวมครบเป้าเมื่อไหร่ ปลาจะขึ้นฝูง กินเบ็ดไวมากค่ะ','อีกไม่นานปลาตำนานจะโผล่ ตอนนั้นใครพิมพ์ทันได้ลุ้นค่ะ',
+  'ชอบบรรยากาศริมบึงแบบนี้ กดติดตามไว้ได้เลยนะคะ จะได้ไม่พลาดไลฟ์หน้า','ขอบคุณทุกคนที่แวะมานั่งตกปลาด้วยกันนะคะ','ลมเย็นสบาย น้ำนิ่ง วันนี้ปลาน่าจะกินเบ็ดดีค่ะ'];
+const MC_WELCOME=['ยินดีต้อนรับคุณ{n}ค่ะ พิมพ์อะไรก็ได้เพื่อตกปลาเลยค่ะ','สวัสดีค่ะคุณ{n} พิมพ์มาสักคำ แล้วมานั่งตกปลาด้วยกันค่ะ','คุณ{n}มาแล้วค่ะ พิมพ์อะไรก็ได้ในแชท เพื่อเริ่มตกปลาค่ะ'];
+const MC_SEAT=['คุณ{n}นั่งลงที่ท่าน้ำแล้วค่ะ รอลุ้นปลากันเลย','คุณ{n}เหวี่ยงเบ็ดแล้วค่ะ ขอให้ได้ตัวใหญ่นะคะ'];
+function pickLine(list){let t;for(let i=0;i<8;i++){t=pick(list);if(!MC.recent.includes(t))break}MC.recent.push(t);if(MC.recent.length>7)MC.recent.shift();return t}
+// เสียงพูดสะอาด อุ่นขึ้นเล็กน้อย มีห้องก้องบางๆ เหมือนนั่งคุยริมน้ำ (ต่างจากโคมที่เป็นลำโพงฮอร์นงานวัด)
+function mcPA(){const c=SND.ctx;if(MC.pa)return MC.pa;const inp=c.createGain(),warm=c.createBiquadFilter(),air=c.createBiquadFilter(),dl=c.createDelay(1),fb=c.createGain(),wet=c.createGain(),lp=c.createBiquadFilter();
+  warm.type='lowshelf';warm.frequency.value=250;warm.gain.value=2;air.type='highshelf';air.frequency.value=6000;air.gain.value=2;
+  dl.delayTime.value=0.09;fb.gain.value=0.18;wet.gain.value=0.1;lp.type='lowpass';lp.frequency.value=2500;
+  inp.connect(warm).connect(air);air.connect(SND.master);air.connect(dl);dl.connect(lp).connect(fb).connect(dl);lp.connect(wet).connect(SND.master);return MC.pa=inp}
+function mcChime(){const c=SND.ctx,t0=c.currentTime;[[659,0],[988,0.16]].forEach(([f,d])=>{for(const [m,v] of [[1,0.35],[4,0.06]]){const o=c.createOscillator(),gn=c.createGain();o.type='sine';o.frequency.value=f*m;gn.gain.setValueAtTime(0.0001,t0+d);gn.gain.exponentialRampToValueAtTime(v,t0+d+0.01);gn.gain.exponentialRampToValueAtTime(0.0001,t0+d+0.6);o.connect(gn).connect(mcPA());o.start(t0+d);o.stop(t0+d+0.65)}});return new Promise(r=>setTimeout(r,650))}
+function mcSay(t,o={}){if(PRESIM||(!CFG.mc&&!o.pri))return;if(o.n!=null&&!clean(o.n))return;const q=MC.q;if(q.length>=10){const i=q.findIndex(x=>!x.pri);if(i<0)return;q.splice(i,1)}
+  const it={t,n:o.n,f:o.f,pri:o.pri||0,chime:o.chime,w:o.w,at:performance.now()/1000,ttl:o.ttl||30};if(it.pri){const i=q.findIndex(x=>!x.pri);q.splice(i<0?q.length:i,0,it)}else q.push(it);if(!MC.busy)mcNext()}
+async function mcNext(){const c=SND.ctx,now=()=>performance.now()/1000;MC.q=MC.q.filter(x=>now()-x.at<x.ttl);const a=MC.q.shift();if(!a){MC.busy=false;return}
+  if(!c||c.state!=='running'){MC.busy=false;MC.q.length=0;return}MC.busy=true;
+  const url='/mc?v=f&t='+encodeURIComponent(a.t)+(a.n!=null?'&n='+encodeURIComponent(a.n):'')+(a.f?'&f='+encodeURIComponent(a.f):'');
+  const bufP=fetch(url,{cache:'no-cache'}).then(r=>r.ok?r.arrayBuffer():null).then(b=>b?c.decodeAudioData(b):null).catch(()=>null);
+  if(MUS.bus)MUS.bus.gain.setTargetAtTime(MUS.vol*0.4,c.currentTime,0.1);if(a.chime)await mcChime();
+  const buf=await Promise.race([bufP,new Promise(r=>setTimeout(()=>r(null),7000))]);
+  if(buf)await new Promise(res=>{const s=c.createBufferSource(),gn=c.createGain();s.buffer=buf;gn.gain.value=0.95;s.connect(gn).connect(mcPA());s.onended=res;s.start();setTimeout(res,(buf.duration+2)*1000)});
+  MC.lastEnd=NOW;MC.said=(MC.said||0)+(buf?1:0);if(!MC.q.length&&MUS.bus)MUS.bus.gain.setTargetAtTime(MUS.vol,c.currentTime,0.6);setTimeout(mcNext,MC.q.length?250:500)}
+const greeted=new Set();
+function welcome(name){if(PRESIM||!name||greeted.has(name)||!clean(name))return;greeted.add(name);toasts.push({s:'ยินดีต้อนรับ '+short(name,12),t:NOW});
+  if(CFG.welcome)mcSay(MC.q.filter(x=>x.w).length>=2?'ยินดีต้อนรับคุณ{n}ค่ะ':pickLine(MC_WELCOME),{n:name,f:'ยินดีต้อนรับผู้ชมท่านใหม่ค่ะ พิมพ์อะไรก็ได้เพื่อตกปลาค่ะ',ttl:25,w:1})}
+function welcomeFirst(p){if(p.npc)return;const was=greeted.has(p.name);greeted.add(p.name);if(MC.q.length<4)mcSay(pickLine(was?MC_SEAT:MC_SEAT),{n:p.name,f:'มีคนมานั่งตกปลาเพิ่มแล้วค่ะ',ttl:15})}
+function mcIdle(dt){MC.idleT-=dt;if(SND.ctx&&SND.ctx.state==='suspended'&&(MC.rT=(MC.rT||0)-dt)<0){MC.rT=3;SND.ctx.resume().catch(()=>{})}if(MC.idleT>0||MC.busy||MC.q.length||NOW-MC.lastEnd<4)return;MC.idleT=rnd(CFG.gap*0.8,CFG.gap*1.2);MC.n++;mcSay(pickLine(MC_IDLE),{chime:MC.n%4===1,ttl:10})}
+sndInit();
+
+// ---------- ชาวบึง (บอท): นั่งตกปลาเองตอนคนน้อย ป้ายสีเทา ไม่ขึ้นกระดาน ไม่ปลอมเป็นคนดู ----------
+const NPC={level:Q.has('npc')?clamp(+Q.get('npc')|0,0,2):1,t:3,i:0,names:['ลุงชาวประมง','ป้าแม่ค้าริมน้ำ','น้าเรือจ้าง','พี่เฝ้าท่าน้ำ','ตาริมบึง','น้องชาวสวน']};
+const realActive=()=>Object.values(P).some(p=>!p.npc&&NOW-p.last<40);
+function attract(dt){if(NPC.level>0){NPC.t-=dt;if(NPC.t<=0){const busy=realActive(),n=fishers.filter(F=>F.p.npc).length,max=NPC.level===2?(busy?2:5):(busy?1:3);NPC.t=busy?rnd(10,16):rnd(4,7);
+  if(n<max||Math.random()<0.5){const nm=NPC.names[NPC.i++%NPC.names.length],p=P['npc:'+nm]||(P['npc:'+nm]={name:nm,npc:true,hearts:0,casts:0,last:NOW,shirt:'#5a7090'});p.last=NOW;cast(p)}}}
+  mcIdle(dt)}
+function joined(name,pic){if(PRESIM||!name||!clean(name))return;player(name,pic);welcome(name)}
+
+// ---------- กล้อง: แกว่งช้าๆ ซูมไปหาคนได้ปลาตำนาน ----------
+let honor=null,honQ=[];const camAim=LOOK.clone(),camPos=CAM0.clone();
+function honorOf(F,dur=6.5){if(honQ.length<3&&!honQ.some(h=>h.F===F))honQ.push({F,dur})}
+function updCamera(dt){if(!honor&&honQ.length){honor=honQ.shift();honor.t0=NOW}
+  let tp=TMP.set(CAM0.x+Math.sin(NOW*0.07)*2.2,CAM0.y+Math.sin(NOW*0.11)*0.5,CAM0.z),ta=TMP2.copy(LOOK);
+  if(honor){const k=NOW-honor.t0,F=honor.F,a=clamp(Math.min(k*1.4,(honor.dur-k)*1.4),0,1);if(k>honor.dur||!fishers.includes(F))honor=null;else{const s=F.slot,fp=new THREE.Vector3(s.x,PIER.y+3,s.z);
+    tp.lerp(new THREE.Vector3(s.x*0.3+s.sx*1,PIER.y+7,s.z+17),ease.inOut(a));ta.lerp(fp.add(new THREE.Vector3(s.sx*2,1.2,0)),ease.inOut(a))}}
+  camPos.lerp(tp,Math.min(1,dt*2.2));camAim.lerp(ta,Math.min(1,dt*2.6));camera.position.copy(camPos);camera.lookAt(camAim)}
+
+// ---------- ของที่ขยับทุกเฟรม ----------
+function updScene(dt){T.value=NOW;const d=dayAt(NOW+(CFG.cycle*60)*0.02);DAY.cur=d;
+  sky.material.uniforms.top.value.copy(d.top);sky.material.uniforms.mid.value.copy(d.mid);sky.material.uniforms.hor.value.copy(d.hor);sky.material.uniforms.sunK.value=d.sun;
+  sun.position.y=d.sunY;sun.visible=d.sunY>-14;sky.material.uniforms.sunDir.value.set(sun.position.x,sun.position.y,sun.position.z).normalize();
+  moon.children.forEach(m=>{m.material.opacity=d.moon*(m.isMesh?1:m.userData.o??(m.userData.o=m.material.opacity))});moon.visible=d.moon>0.02;
+  starMat.uniforms.amt.value=d.star;scene.fog.color.copy(d.fog);water.material.uniforms.color.value.copy(d.water);
+  hemi.intensity=d.hemi;sunL.intensity=0.25+d.sun*1.1;sunL.color.setHSL(0.07,0.8,0.5+0.15*(1-d.sun));
+  for(const L of lamps)L.material.opacity=0.25+0.75*d.lamp*(0.9+0.1*Math.sin(NOW*7+L.position.z));for(const w of winGlows)w.material.opacity=0.3+0.6*d.lamp;
+  for(const c of clouds){c.position.x+=dt*1.5;if(c.position.x>420)c.position.x=-420;c.material.color.setRGB(lerp(0.55,1,d.sun),lerp(0.5,0.7,d.sun),lerp(0.7,0.62,d.sun))}
+  flies.forEach(f=>{const u=f.userData;f.position.x=u.bx+Math.sin(NOW*0.4+u.p)*3;f.position.z=u.bz+Math.cos(NOW*0.3+u.p)*3;f.position.y=1.5+Math.sin(NOW*0.9+u.p)*1.2;f.material.opacity=d.star*0.9*(0.5+0.5*Math.sin(NOW*3+u.p))});
+  birds.forEach((b,i)=>{const u=b.userData,x=((NOW*9+u.o*20)%700)-350;b.position.set(x,u.y+Math.sin(NOW*0.5+i)*3,u.z);b.scale.y=2.5*(0.6+0.4*Math.abs(Math.sin(NOW*6+i)));b.material.opacity=d.sun});
+  lotusFl.forEach((f,i)=>f.rotation.y=Math.sin(NOW*0.3+i)*0.2);DAY.boat.position.y=Math.sin(NOW*0.8)*0.08;DAY.boat.rotation.z=Math.sin(NOW*0.6)*0.03;
+  updFishers(dt);updFlying(dt);updRings();ambientJump(dt);legendTick();updLegShadow();updSparks3(dt);updVip(dt);updBeams();updHeartShow(dt)}
+const composer=new EffectComposer(renderer);composer.setSize(W,H);composer.addPass(new RenderPass(scene,camera));
+const bloom=new UnrealBloomPass(new THREE.Vector2(W/2,H/2),0.5,0.4,0.66);composer.addPass(bloom);composer.addPass(new OutputPass());
+
+// ---------- จอ 2 มิติทับด้านบน ----------
+const ui=document.getElementById('ui'),g=ui.getContext('2d');
+function txt(s,x,y,size,col='#fff',align='left',w=700,stroke='rgba(20,10,24,.9)'){g.font=`${w} ${size}px ${FONT}`;g.textAlign=align;g.lineJoin='round';g.lineWidth=Math.max(5,size/4.5);g.strokeStyle=stroke;g.strokeText(s,x,y);g.fillStyle=col;g.fillText(s,x,y)}
+function panel(x,y,w,h,bc='#fff',a=0.6,fill='30,20,40'){g.beginPath();g.roundRect(x,y,w,h,22);g.fillStyle=`rgba(${fill},${a})`;g.fill();g.globalAlpha=0.75;g.strokeStyle=bc;g.lineWidth=2.5;g.beginPath();g.roundRect(x+2,y+2,w-4,h-4,20);g.stroke();g.globalAlpha=1}
+function heart(x,y,s,col='#ff6a8a'){g.fillStyle=col;g.beginPath();g.moveTo(x,y+s*0.35);g.bezierCurveTo(x-s*0.9,y-s*0.25,x-s*0.35,y-s*0.85,x,y-s*0.35);g.bezierCurveTo(x+s*0.35,y-s*0.85,x+s*0.9,y-s*0.25,x,y+s*0.35);g.fill()}
+function drawImg(im,x,y,s){if(im&&im.complete&&im.naturalWidth){g.drawImage(im,x-s/2,y-s/2,s,s);return true}return false}
+function avatar(p,x,y,r,ring){if(!p)return;g.save();g.beginPath();g.arc(x,y,r+3,0,7);g.fillStyle=ring;g.fill();g.beginPath();g.arc(x,y,r,0,7);g.clip();
+  if(p.pic&&p.pic.complete&&p.pic.naturalWidth)g.drawImage(p.pic,x-r,y-r,r*2,r*2);else{g.fillStyle=p.shirt||'#6a5a8a';g.fillRect(x-r,y-r,r*2,r*2);g.font=`700 ${r}px ${FONT}`;g.textAlign='center';g.fillStyle='#fff';g.fillText((p.name||'?').slice(0,1).toUpperCase(),x,y+r*0.36)}g.restore()}
+const hex=c=>'#'+new THREE.Color(c).getHexString();
+// ปลา 2 มิติบนการ์ด วาดจากสีชุดเดียวกับโมเดล
+function fish2D(f,x,y,len,maxH){const im=FIMG[f.n];if(im&&im.complete&&im.naturalWidth){let w=len,h=w*im.naturalHeight/im.naturalWidth;if(maxH&&h>maxH){h=maxH;w=h*im.naturalWidth/im.naturalHeight}g.drawImage(im,x-w/2,y-h/2,w,h);return}fish2Dcode(f,x,y,len)}
+function fish2Dcode(f,x,y,len){const h=len*(f.long?0.3:0.42),bx=x-len*0.08;g.save();
+  g.fillStyle=hex(f.fin);g.beginPath();g.moveTo(bx-len*0.38,y);g.lineTo(bx-len*0.62,y-h*0.62);g.quadraticCurveTo(bx-len*0.5,y,bx-len*0.62,y+h*0.62);g.closePath();g.fill();
+  g.beginPath();g.moveTo(bx-len*0.05,y-h*0.42);g.quadraticCurveTo(bx+len*0.05,y-h*0.95,bx+len*0.18,y-h*0.4);g.fill();
+  const gr=g.createLinearGradient(0,y-h/2,0,y+h/2);gr.addColorStop(0,hex(f.body));gr.addColorStop(0.55,hex(f.body));gr.addColorStop(1,hex(f.belly));g.fillStyle=gr;g.beginPath();g.ellipse(bx,y,len*0.44,h/2,0,0,7);g.fill();
+  g.save();g.beginPath();g.ellipse(bx,y,len*0.44,h/2,0,0,7);g.clip();g.fillStyle='rgba(0,0,0,.28)';
+  if(f.pat==='stripe')for(let i=-3;i<=3;i++)g.fillRect(bx+i*len*0.1-len*0.02,y-h/2,len*0.035,h*0.6);
+  if(f.pat==='spot')for(let i=0;i<9;i++){g.beginPath();g.arc(bx+(i%3-1)*len*0.16+((i/3|0)-1)*len*0.05,y-h*0.1+((i/3|0)-1)*h*0.18,len*0.025,0,7);g.fill()}
+  if(f.pat==='scale'){g.strokeStyle='rgba(255,255,255,.25)';g.lineWidth=2;for(let i=0;i<7;i++)for(let j=0;j<3;j++){g.beginPath();g.arc(bx-len*0.25+i*len*0.08,y-h*0.25+j*h*0.25,len*0.04,-1.2,1.2);g.stroke()}}
+  g.fillStyle='rgba(255,255,255,.22)';g.beginPath();g.ellipse(bx+len*0.05,y-h*0.22,len*0.28,h*0.1,-0.05,0,7);g.fill();g.restore();
+  g.fillStyle='#fff';g.beginPath();g.arc(bx+len*0.3,y-h*0.08,len*0.045,0,7);g.fill();g.fillStyle='#111';g.beginPath();g.arc(bx+len*0.31,y-h*0.08,len*0.026,0,7);g.fill();
+  if(f.n==='ปลาดุก'||f.n==='ปลาบึก'){g.strokeStyle=hex(f.fin);g.lineWidth=3;for(const s of [-1,1]){g.beginPath();g.moveTo(bx+len*0.42,y+h*0.05);g.quadraticCurveTo(bx+len*0.55,y+s*h*0.3,bx+len*0.6,y+s*h*0.45);g.stroke()}}
+  g.restore()}
+// มงกุฎสองมิติ (บนป้ายชื่อ แถบขอบคุณ กระดานผู้สนับสนุน)
+function crown2D(x,y,s){g.save();g.translate(x,y);g.beginPath();g.moveTo(-s,s*0.45);g.lineTo(-s,-s*0.35);g.lineTo(-s*0.5,s*0.05);g.lineTo(0,-s*0.6);g.lineTo(s*0.5,s*0.05);g.lineTo(s,-s*0.35);g.lineTo(s,s*0.45);g.closePath();
+  g.fillStyle='#ffc83a';g.fill();g.lineWidth=Math.max(2,s*0.12);g.strokeStyle='#7a4a08';g.stroke();g.fillStyle='#ff3a5a';g.beginPath();g.arc(0,s*0.15,s*0.16,0,7);g.fill();g.restore()}
+const V=new THREE.Vector3();
+function screenOf(F,dy=2.4){V.setFromMatrixPosition(F.g.matrixWorld);V.y+=dy;V.project(camera);return {x:(V.x*0.5+0.5)*W,y:(-V.y*0.5+0.5)*H,ok:V.z<1}}
+function bubble(text,x,y){const t=text.length>18?text.slice(0,17)+'…':text;g.font=`600 26px ${FONT}`;const w=Math.max(70,g.measureText(t).width+28),h=44,bx=clamp(x-w/2,12,W-12-w);
+  g.fillStyle='rgba(255,252,240,.96)';g.beginPath();g.roundRect(bx,y-h,w,h,16);g.fill();g.beginPath();g.moveTo(x-9,y-1);g.lineTo(x+9,y-1);g.lineTo(x,y+12);g.fill();g.fillStyle='#3a2a30';g.textAlign='center';g.fillText(t,bx+w/2,y-13)}
+// ป้ายชื่อเหนือหัวทุกคนบนท่า คนที่กำลังมีเรื่อง (เพิ่งพิมพ์ ปลากินเบ็ด ได้ปลา) ป้ายใหญ่
+function drawTags(){bubbles=bubbles.filter(b=>NOW-b.t<4.5);const list=fishers.map(F=>({F,s:screenOf(F)})).filter(o=>o.s.ok&&o.s.y>SAFE_T+260&&o.s.y<SAFE_B+120).sort((a,b)=>a.s.y-b.s.y);
+  for(const {F,s} of list){const p=F.p,hot=NOW-p.last<6||F.st==='bite'||F.st==='reel'||F.st==='show',r=p.npc?13:hot?24:17;
+    avatar(p,s.x,s.y-r,r,p.npc?'#9fb0c4':F.st==='show'?RAR[F.catch.r].c:p.coins?'#ffd04a':'#ffd08a');txt(short(p.name,p.npc?12:9),s.x,s.y+(p.npc?16:22),p.npc?17:hot?24:19,p.npc?'#cdd8e6':p.coins?'#ffe066':'#ffe9c0','center',700);if(p.coins)crown2D(s.x,s.y-r*2-4,r*0.8);
+    if(F.slot.vip&&!p.npc){const w=vipWho();if(w[F.slot.vip]===p){const lab=F.slot.vip==='give'?'ผู้สนับสนุนอันดับ 1':'นักตกปลาอันดับ 1',col=F.slot.vip==='give'?'#ffd04a':'#7fd8ff';g.font='700 20px '+FONT;const lw=g.measureText(lab).width+24;g.fillStyle=col;g.beginPath();g.roundRect(s.x-lw/2,s.y+34,lw,30,15);g.fill();txt(lab,s.x,s.y+56,20,'#1a1420','center',700,'rgba(0,0,0,0)')}}
+    if(p.caughtN&&!p.npc){const bp=NOW-(F.bucketPop??-9),bs=bp<0.35?1+Math.sin(bp/0.35*Math.PI)*0.5:1,bx=s.x-r-14,by=s.y-r;g.save();g.translate(bx,by);g.scale(bs,bs);g.fillStyle='#2a6a9a';g.beginPath();g.arc(0,0,16,0,7);g.fill();g.lineWidth=2.5;g.strokeStyle='#bfe6ff';g.stroke();txt(String(p.caughtN),0,7,18,'#fff','center',700,'rgba(0,0,0,0)');g.restore()}
+    if(F.st==='bite'){const k=NOW-F.excl;txt('!',s.x+r+10,s.y-r-6-Math.abs(Math.sin(k*10))*8,48,'#ffd04a','center')}
+    const b=bubbles.filter(x=>x.p===p).pop();if(b&&!p.npc){g.globalAlpha=clamp((4.5-(NOW-b.t))*2,0,1);bubble(b.s,s.x,s.y-r*2-14);g.globalAlpha=1}}}
+function hud(){const d=DAY.cur;
+  panel(16,SAFE_T,1048,186,'#ffcf8a',0.6);
+  txt('ตกปลาริมบึง',60,SAFE_T+40,26,'#ffcf8a','left',700);txt(`${d.n||''}${frenzyOn()?'  ·  ปลาขึ้นฝูง!':''}`,1020,SAFE_T+40,24,frenzyOn()?'#ffd04a':'#e8d8ff','right',600);
+  const pulse=1+0.04*Math.sin(NOW*4);g.save();g.translate(540,SAFE_T+92);g.scale(pulse,pulse);txt('พิมพ์อะไรก็ได้ = ตกปลา',0,0,52,'#ffffff','center',700);g.restore();
+  heart(232,SAFE_T+134,28);txt('กดหัวใจ = ปลากินเบ็ดเร็วขึ้น',540,SAFE_T+146,32,'#ffc0d0','center',700);
+  txt('ปลาลงถังน้ำ ลุกจากท่าเมื่อไหร่ปล่อยคืนบึงทุกตัว',540,SAFE_T+176,20,'#c8e8d0','center',500);
+  const y=SAFE_T+196,g0=msIdx?MS_G(msIdx-1):0,g1=MS_G(msIdx),k=clamp((liveHearts-g0)/(g1-g0),0,1);
+  const near=k>=0.8,hp=near?1+0.25*Math.abs(Math.sin(NOW*6)):1;panel(16,y,1048,50,near?'#ff4a78':'#ff8aa8',near?0.75:0.55);heart(46,y+26,24*hp);txt(near?`อีก ${(g1-liveHearts).toLocaleString()} หัวใจ ครบแล้วอลังการ!`:`หัวใจรวม ${liveHearts.toLocaleString()} / ${g1.toLocaleString()}  ครบแล้วทุกคนได้เหยื่อพิเศษ`,72,y+22,20,near?'#ffe066':'#fff','left',700);
+  txt(`ตกได้แล้ว ${stats.catches.toLocaleString()} ตัว`,1044,y+22,20,'#ffd08a','right',600);
+  g.fillStyle='rgba(0,0,0,.4)';g.fillRect(72,y+32,972,9);const gr=g.createLinearGradient(72,0,1044,0);gr.addColorStop(0,'#ff6a8a');gr.addColorStop(1,'#ffd08a');g.fillStyle=gr;g.fillRect(72,y+32,972*k,9);
+  // ของขวัญ
+  const gy=y+76,GT=[['1+','เหยื่อทอง'],['30+','ปลาหายาก'],['100+','ปลาตำนาน'],['299+','ฝูงปลาทอง']];txt('ส่งของขวัญอะไรก็ได้',22,gy+8,19,'#ffd04a','left',700);
+  GT.forEach(([c,n],i)=>{const x=232+i*212;drawImg(GIMG[TIERS[i].id],x,gy,26);txt(c,x+18,gy+8,18,'#ffd04a','left',700);g.font='700 18px '+FONT;txt(n,x+22+g.measureText(c).width,gy+8,18,'#ffe2a8','left',600)});
+  if(!DEMO&&live.state!=='live')txt({connecting:'กำลังต่อไลฟ์...',offline:'รอไลฟ์เริ่ม...',error:'ต่อไลฟ์ไม่ได้',server:'ไม่เจอ server.js'}[live.state]||'',540,gy+44,22,'#ffd08a','center',500)}
+// กระดานปลาใหญ่สุดวันนี้ (ซ้าย) กับสถิติตลอดกาล
+function drawBoard(){if(cards.some(c=>NOW>=c.t)||banners.some(b=>NOW>=b.t&&NOW<b.t+2.6)||EV.st==='warn'||EV.st==='open'||promptOn())return;const x=16,y=SAFE_T+300,w=330,h=56+Math.max(1,bestToday.length)*62+40;panel(x,y,w,h,'#ffcf8a',0.62,'40,26,20');
+  txt('ปลาใหญ่สุดวันนี้',x+w/2,y+38,24,'#ffcf8a','center');
+  if(!bestToday.length)txt('ยังไม่มีใครตกได้',x+w/2,y+86,20,'#e8d8c8','center',500);
+  bestToday.forEach((p,i)=>{const yy=y+82+i*62;txt(['1','2','3'][i],x+24,yy+8,26,['#ffd04a','#dfe6ee','#e0a070'][i],'center');avatar(p,x+64,yy,22,RAR[p.best.r].c);txt(short(p.name,8),x+96,yy-4,20,'#fff','left',700);txt(`${p.best.f.n} ${p.best.kg} กก.`,x+96,yy+20,17,RAR[p.best.r].c,'left',600)});
+  if(record.best)txt(`สถิติบึง ${(record.best/1000).toFixed(record.best>20000?1:2)} กก.`,x+w/2,y+h-14,17,'#ffe2a8','center',600)}
+// การ์ดเล็กทางขวาใต้ป้ายบน: แสดงพร้อมกัน 4 ใบ ใบละ 7 วิ ถ้ามาถี่ ใบเก่าถูกดันลงแล้วหายเร็วขึ้น ทุกคนยังเห็นของตัวเองเหนือหัวตัวละครด้วย
+const MW=508,MH=100,MX=W-16-MW,MY=SAFE_T+300;
+function drawMini(){mini=mini.filter(m=>NOW-m.t<7);mini.slice(4).forEach(m=>{m.t=Math.min(m.t,NOW-6.4)});
+  mini.slice(0,4).forEach((m,i)=>{const age=NOW-m.t,ty=MY+i*(MH+8);m.y=m.y==null?ty:lerp(m.y,ty,0.25);const k=ease.out(Math.min(1,age/0.35)),a=clamp((7-age)/0.6,0,1),R=RAR[m.c.r],x=MX+(1-k)*(MW+40),y=m.y;
+    g.globalAlpha=a;g.save();if(m.c.r>=2){g.shadowColor=R.c;g.shadowBlur=18}panel(x,y,MW,MH,R.c,0.8,m.c.r>=2?'34,30,60':'26,20,36');g.restore();
+    g.fillStyle=R.c;g.beginPath();g.roundRect(x+6,y+12,7,MH-24,4);g.fill();
+    avatar(m.p,x+56,y+MH/2,32,m.p.npc?'#9fb0c4':R.c);txt(short(m.p.name,10),x+100,y+42,26,m.p.npc?'#cdd8e6':'#fff','left',700);
+    txt(m.c.f.n,x+100,y+76,22,R.c,'left',700);g.font='700 22px '+FONT;const fw=g.measureText(m.c.f.n).width;txt(m.c.kg+' กก.',x+108+fw,y+76,20,'#f4ead8','left',600);
+    if(m.c.r>=1){g.font='700 16px '+FONT;const tw=g.measureText(R.n).width+16;g.fillStyle=R.c;g.beginPath();g.roundRect(x+MW-tw-12,y+8,tw,24,12);g.fill();txt(R.n,x+MW-12-tw/2,y+26,16,'#1a1420','center',700,'rgba(0,0,0,0)')}
+    fish2D(m.c.f,x+MW-104,y+MH/2+(m.c.r>=1?8:0),176,m.c.r>=1?66:80);g.globalAlpha=1})}
+// การ์ดใหญ่กลางจอ: รูป ชื่อ ปลา น้ำหนัก ความหายาก
+function drawCard(){if(EV.st==='warn'||EV.st==='open'){for(const c of cards)c.t=Math.max(c.t,NOW+0.3);return}cards=cards.filter(c=>NOW<c.t+c.d);const cd=cards.find(c=>NOW>=c.t);if(!cd)return;const k=ease.back(Math.min(1,(NOW-cd.t)/0.35)),a=Math.min(1,(cd.t+cd.d-NOW)*3),c=cd.c,R=RAR[c.r],leg=c.r===3,cy=600;
+  g.globalAlpha=a;g.save();g.translate(540,cy);g.scale(k,k);g.translate(-540,-cy);
+  if(c.r>=2){g.save();g.translate(540,cy);g.rotate(NOW*0.4);g.fillStyle=leg?'rgba(255,210,90,.18)':'rgba(120,200,255,.14)';for(let i=0;i<12;i++){g.rotate(Math.PI/6);g.beginPath();g.moveTo(0,0);g.lineTo(-60,-560);g.lineTo(60,-560);g.fill()}g.restore()}
+  const top=cy-170,hh=340;panel(150,top,780,hh,R.c,0.9,leg?'60,40,10':'24,22,44');
+  g.fillStyle=R.c;g.beginPath();g.roundRect(380,top-24,320,48,24);g.fill();txt(R.n,540,top+11,30,'#1a1420','center',700,'rgba(0,0,0,0)');
+  avatar(cd.p,232,top+76,40,R.c);txt(short(cd.p.name,12),288,top+70,36,'#fff','left',700);txt('ได้ปลาตำนาน',288,top+104,24,'#ffe2a8','left',600);
+  fish2D(c.f,540,top+196,520,150);
+  txt(c.f.n,540,top+300,42,R.c,'center',700);txt(`${c.kg} กิโลกรัม`,890,top+70,30,'#fff','right',700);
+  g.restore();g.globalAlpha=1}
+// ช่วงปลาตำนาน: นับถอยหลังใหญ่ จำนวนคนที่ร่วมลุ้น
+function drawEvent(){if(EV.st!=='warn'&&EV.st!=='open')return;const k=NOW-EV.t,left=EV.st==='open'?Math.ceil(15-k):15,pulse=1+0.05*Math.sin(NOW*8);
+  g.save();g.translate(540,540);g.scale(pulse,pulse);g.translate(-540,-540);panel(120,440,840,210,'#ffc83a',0.85,'60,36,8');
+  txt('ปลาตำนานโผล่!',540,500,50,'#ffc83a','center');txt(`พิมพ์อะไรก็ได้ภายใน ${left} วิ เพื่อลุ้น`,540,558,34,'#fff','center',700);txt(`ร่วมลุ้นแล้ว ${EV.who.size} คน  ·  กดหัวใจเพิ่มโอกาส`,540,610,24,'#ffe2a8','center',600);g.restore()}
+function drawBanner(){const bn=banners.find(b=>NOW>=b.t&&NOW<b.t+2.6);banners=banners.filter(b=>NOW<b.t+2.6);if(!bn||cards.some(c=>NOW>=c.t))return;
+  const k=ease.back(Math.min(1,(NOW-bn.t)/0.3));g.save();g.translate(540,640);g.scale(k,k);g.translate(-540,-640);panel(90,570,900,bn.sub?150:100,bn.col,0.84);txt(bn.s,540,636,46,bn.col,'center');if(bn.sub)txt(bn.sub,540,690,28,'#fff','center',600);g.restore()}
+// ชวนเล่นตอนเงียบ: ฟองแชทตัวอย่างพิมพ์ทีละตัว แล้วลูกศรชี้ไปที่ท่าน้ำ
+const EXAMPLES=['ตกปลา','ขอตัวใหญ่ๆ','สวัสดีค่ะ','1','ลุ้นปลาบึก'];
+const promptOn=()=>(NOW-lastReal>18||NOW-helpShow<8)&&!cards.some(c=>NOW>=c.t)&&EV.st==='off';
+function drawPrompt(){const help=NOW-helpShow<8;if(!promptOn())return;
+  const ex=EXAMPLES[Math.floor(NOW/5)%EXAMPLES.length],n=Math.min(ex.length,Math.floor((NOW%5)*5)),a=clamp(Math.min((NOW%5)*3,(5-NOW%5)*3),0,1);
+  panel(150,470,780,250,'#ffcf8a',0.78);txt(help?'วิธีเล่น':'มาตกปลากัน',540,524,30,'#ffcf8a','center');txt('พิมพ์อะไรก็ได้ในแชท',540,580,44,'#fff','center');
+  g.globalAlpha=a;g.fillStyle='rgba(255,255,255,.95)';g.beginPath();g.roundRect(300,612,480,58,29);g.fill();g.font=`600 30px ${FONT}`;g.fillStyle='#2a2030';g.textAlign='left';g.fillText(ex.slice(0,n)+(Math.floor(NOW*2)%2?'|':''),330,652);g.globalAlpha=1;
+  txt('ตัวละครชื่อคุณจะมานั่งตกปลาทันที',540,700,24,'#ffe2a8','center',600)}
+// tier: 0 = ต่ำกว่า 10 เหรียญ  1 = 10+  2 = 100+  3 = 299+   ขนาดการ์ด ไอคอน ลำแสง และเอฟเฟกต์เพิ่มตามระดับ
+function drawThanks(){thanks=thanks.filter(x=>NOW<x.t+x.d);const x=thanks.find(x=>NOW>=x.t);if(!x)return;
+  const age=NOW-x.t,tier=x.coins>=299?3:x.coins>=100?2:x.coins>=10?1:0,k=ease.back(Math.min(1,age/0.4)),a=Math.min(1,(x.t+x.d-NOW)*3),cy=640,
+    cw=[640,760,880,960][tier],ch=[300,340,400,440][tier],isz=[150,190,240,280][tier];
+  g.globalAlpha=a;
+  // ฉากหลังมืดลงเล็กน้อยให้การ์ดเด่น (ระดับสูงมืดกว่า)
+  g.fillStyle=`rgba(10,6,20,${[0.18,0.28,0.42,0.5][tier]*Math.min(1,age*4)})`;g.fillRect(0,0,W,H);
+  // ลำแสงหมุนหลังการ์ด (ระดับ 1 ขึ้นไป) ระดับ 3 เป็นสีรุ้ง
+  if(tier>=1){g.save();g.translate(540,cy);g.rotate(NOW*0.45);const n=[0,12,16,20][tier];for(let i=0;i<n;i++){g.rotate(Math.PI*2/n);g.fillStyle=tier>=3?`hsla(${(i*40+NOW*90)%360},90%,65%,.22)`:'rgba(255,214,110,.2)';g.beginPath();g.moveTo(0,0);g.lineTo(-50-tier*12,-900);g.lineTo(50+tier*12,-900);g.fill()}g.restore()}
+  // แสงวาบตอนเปิด (100 เหรียญขึ้นไป)
+  if(tier>=2&&age<0.4){g.fillStyle=`rgba(255,240,200,${0.6*(1-age/0.4)})`;g.fillRect(0,0,W,H)}
+  g.save();g.translate(540,cy);g.scale(k,k);g.translate(-540,-cy);
+  const x0=540-cw/2,y0=cy-ch/2,gr=g.createLinearGradient(0,y0,0,y0+ch);gr.addColorStop(0,'#5a3a08');gr.addColorStop(0.5,'#2a1a06');gr.addColorStop(1,'#4a2e06');
+  g.fillStyle=gr;g.beginPath();g.roundRect(x0,y0,cw,ch,30);g.fill();
+  const bd=g.createLinearGradient(x0,0,x0+cw,0);bd.addColorStop(0,'#b07818');bd.addColorStop(0.5,'#fff0b0');bd.addColorStop(1,'#b07818');g.lineWidth=[5,6,8,10][tier];g.strokeStyle=bd;g.beginPath();g.roundRect(x0+3,y0+3,cw-6,ch-6,28);g.stroke();
+  // แสงวิ่งผ่านการ์ด
+  g.save();g.beginPath();g.roundRect(x0,y0,cw,ch,30);g.clip();const sx=x0+((age*800)%(cw+600))-300,sh=g.createLinearGradient(sx-90,0,sx+90,0);sh.addColorStop(0,'rgba(255,255,255,0)');sh.addColorStop(0.5,'rgba(255,240,200,.22)');sh.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=sh;g.fillRect(x0,y0,cw,ch);g.restore();
+  // ป้ายบนการ์ด
+  const lab=['ขอบคุณของขวัญ','ขอบคุณมากๆ','สุดยอดผู้สนับสนุน','ราชาแห่งบึง'][tier];g.font='700 30px '+FONT;const lw=g.measureText(lab).width+60;
+  g.fillStyle=tier>=3?`hsl(${(NOW*120)%360},85%,60%)`:'#ffc83a';g.beginPath();g.roundRect(540-lw/2,y0-26,lw,52,26);g.fill();txt(lab,540,y0+11,30,'#2a1400','center',700,'rgba(0,0,0,0)');
+  // ไอคอนของขวัญใหญ่ เด้งตามจังหวะ มีวงแสงหลังไอคอน
+  const ix=x0+cw-isz*0.62-24,iy=cy+4,bounce=1+0.08*Math.sin(NOW*7);const halo=g.createRadialGradient(ix,iy,10,ix,iy,isz*0.8);halo.addColorStop(0,'rgba(255,230,140,.7)');halo.addColorStop(1,'rgba(255,230,140,0)');g.fillStyle=halo;g.fillRect(ix-isz,iy-isz,isz*2,isz*2);
+  if(!drawImg(x.icon,ix,iy,isz*bounce))txt(x.coins+'',ix,iy+20,60,'#ffd04a','center');
+  // คนส่ง: รูป มงกุฎ ชื่อ ของที่ส่ง
+  const ax=x0+36+[52,60,72,80][tier],ar=[52,60,72,80][tier];avatar(x.p,ax,cy-24,ar,'#ffd04a');crown2D(ax,cy-24-ar-14,ar*0.55);
+  const tx=ax+ar+26,nameSz=[40,46,54,60][tier];txt(short(x.p.name,11),tx,cy-34,nameSz,'#ffe066','left',700);
+  txt('ส่ง '+x.gn+(x.count>1?'  x'+x.count:''),tx,cy+18,[28,32,36,40][tier],'#fff','left',700);
+  txt(x.coins.toLocaleString()+' เหรียญ',ax-ar,cy+ar+42,[22,24,28,30][tier],'#ffd890','left',600);
+  // ประกายรอบการ์ด
+  g.fillStyle='#fffbe8';for(let i=0;i<8+tier*8;i++){const an=i*2.39+NOW*0.6,rr=cw*0.52+Math.sin(NOW*3+i)*20,px=540+Math.cos(an)*rr,py=cy+Math.sin(an)*ch*0.62,ss=3+3*Math.abs(Math.sin(NOW*6+i));g.fillRect(px-ss,py-1.5,ss*2,3);g.fillRect(px-1.5,py-ss,3,ss*2)}
+  g.restore();g.globalAlpha=1}
+// ฝนเหรียญทอง (100 เหรียญขึ้นไป)
+let coinRain=[];function coinBurst(n){for(let i=0;i<n;i++)coinRain.push({x:rnd(40,W-40),y:rnd(-400,-20),vy:rnd(380,640),r:rnd(0,6),t:NOW})}
+function drawCoinRain(){if(!coinRain.length)return;const dt=1/60;for(const c of coinRain){c.y+=c.vy*dt;c.r+=dt*6;const w=Math.abs(Math.cos(c.r))*16+3;g.globalAlpha=clamp((3.5-(NOW-c.t))*2,0,1);g.fillStyle='#ffc83a';g.beginPath();g.ellipse(c.x,c.y,w,18,0,0,7);g.fill();g.strokeStyle='#8a5a10';g.lineWidth=2;g.stroke()}g.globalAlpha=1;coinRain=coinRain.filter(c=>c.y<H+30&&NOW-c.t<3.5)}
+// กระดานผู้สนับสนุน (ซ้าย ใต้กระดานปลา): คนที่ส่งของขวัญล่าสุด 4 คน ค้างทั้งไลฟ์
+const leftY=()=>SAFE_T+300+(56+Math.max(1,bestToday.length)*62+40)+12;
+let supB=0;
+function drawSupporters(){supB=leftY();if(!supporters.size||cards.some(c=>NOW>=c.t))return;const list=[...supporters].sort((a,b)=>b[1].coins-a[1].coins||b[1].t-a[1].t).slice(0,4),x=16,y=leftY(),w=330,h=52+86+(list.length-1)*48;
+  panel(x,y,w,h,'#ffd04a',0.72,'52,34,8');crown2D(x+28,y+28,13);txt('ผู้สนับสนุนสูงสุด',x+50,y+36,22,'#ffd04a','left',700);
+  // อันดับ 1 ปักหมุด: แถวใหญ่ กรอบทองเรืองแสง มงกุฎใหญ่
+  const [p1,v1]=list[0],y1=y+52;g.save();g.shadowColor='#ffc83a';g.shadowBlur=14+6*Math.sin(NOW*3);g.fillStyle='rgba(255,200,80,.2)';g.beginPath();g.roundRect(x+8,y1,w-16,78,16);g.fill();g.restore();g.lineWidth=2.5;g.strokeStyle='#ffd04a';g.beginPath();g.roundRect(x+8,y1,w-16,78,16);g.stroke();
+  avatar(p1,x+50,y1+42,28,'#ffd04a');crown2D(x+50,y1+8,15);txt('1',x+20,y1+24,20,'#ffd04a','left',700);txt(short(p1.name,9),x+88,y1+34,24,'#ffe066','left',700);txt(v1.coins.toLocaleString()+' เหรียญ',x+88,y1+64,18,'#ffd890','left',600);drawImg(v1.icon,x+w-44,y1+40,44);
+  list.slice(1).forEach(([p,v],i)=>{const yy=y1+78+28+i*48,fresh=NOW-v.t<4;if(fresh){g.fillStyle=`rgba(255,210,90,${0.25*(1-(NOW-v.t)/4)})`;g.fillRect(x+6,yy-22,w-12,44)}txt(String(i+2),x+20,yy+7,18,'#e8d0a0','left',700);avatar(p,x+50,yy,17,'#e0b050');txt(short(p.name,9),x+76,yy+8,19,'#ffe9a8','left',700);drawImg(v.icon,x+w-74,yy,28);txt(String(v.coins),x+w-14,yy+8,18,'#ffd04a','right',700)});supB=y+h+10}
+function drawConfetti(){if(!confetti.length)return;const dt=1/60;for(const c of confetti){c.x+=c.vx*dt;c.y+=c.vy*dt;c.r+=c.vr*dt;g.save();g.translate(c.x,c.y);g.rotate(c.r);g.fillStyle=c.c;g.globalAlpha=clamp((3.2-(NOW-c.t))*2,0,1);g.fillRect(-c.w/2,-c.w*0.3,c.w,c.w*0.6);g.restore()}g.globalAlpha=1;confetti=confetti.filter(c=>c.y<H&&NOW-c.t<3.2)}
+function drawToasts(){toasts=toasts.filter(x=>NOW-x.t<5);toasts.slice(-2).forEach((x,i)=>{const a=clamp((5-(NOW-x.t))*2,0,1);g.globalAlpha=a;g.font=`700 24px ${FONT}`;const w=g.measureText(x.s).width+(x.img?80:40);
+  const ty=Math.max(supB,leftY())+i*54;g.fillStyle='rgba(70,24,40,.86)';g.beginPath();g.roundRect(16,ty,w,44,22);g.fill();if(x.img)drawImg(x.img,46,ty+22,30);txt(x.s,16+(x.img?60:20),ty+31,24,'#ffe9c0','left',700);g.globalAlpha=1})}
+function drawHonorFx(){if(!honor)return;const t=NOW-honor.t0,a=clamp(Math.min(t*2,(honor.dur-t)*2),0,1);if(a<=0)return;const vg=g.createRadialGradient(540,900,260,540,900,1150);vg.addColorStop(0,'rgba(20,10,5,0)');vg.addColorStop(1,`rgba(20,10,5,${0.55*a})`);g.fillStyle=vg;g.fillRect(0,0,W,H)}
+function drawOverlay(){g.clearRect(0,0,W,H);drawHonorFx();drawTags();drawHeartFx();hud();drawBoard();drawSupporters();drawToasts();drawMini();drawPrompt();drawEvent();drawBanner();drawCard();drawThanks();drawCoinRain();drawConfetti();drawHeartShow();
+  if(SND.ctx&&SND.ctx.state!=='running'){g.fillStyle='rgba(14,16,20,.8)';g.beginPath();g.roundRect(290,1846,500,52,26);g.fill();txt('คลิกจอ 1 ครั้ง เพื่อเปิดเสียง',540,1882,28,'#ffd08a','center',600)}
+  if((Q.has('test')||Q.has('fps'))&&fpsNow){g.fillStyle='rgba(14,16,20,.75)';g.beginPath();g.roundRect(W-250,1690,234,44,12);g.fill();txt(`${Math.round(fpsNow)} เฟรม/วิ${quality?'  ลดภาพ '+quality:''}`,W-133,1721,24,fpsNow>=50?'#9fe08a':fpsNow>=34?'#ffd04a':'#ff6a6a','center',600)}
+  if(SHOWSAFE){g.fillStyle='rgba(255,0,0,.25)';g.fillRect(0,0,W,SAFE_T);g.fillRect(0,SAFE_B,W,H-SAFE_B)}}
+
+// ---------- คำสั่งจากหน้า /studio และรายงานสถานะ ----------
+function control(c){const a=c.arg;if(c.cmd==='npc')NPC.level=clamp(+a|0,0,2);else if(c.cmd==='legend'){EV.st='off';EV.next=0;legendStart()}else if(c.cmd==='frenzy')frenzy();
+  else if(c.cmd==='say'&&a&&clean(a))mcSay(String(a).slice(0,150),{pri:1,chime:1,ttl:60});else if(c.cmd==='reload')location.reload();
+  else if(c.cmd==='musvol'){MUS.vol=clamp(+a||0,0,1);if(MUS.bus)MUS.bus.gain.value=MUS.vol}else if(c.cmd==='mc')CFG.mc=+a?1:0;else if(c.cmd==='welcome')CFG.welcome=+a?1:0;
+  else if(c.cmd==='mcgap')CFG.gap=clamp(+a||15,6,120);else if(c.cmd==='legendgap'){CFG.legend=clamp(+a||6,2,30);EV.next=Math.min(EV.next,NOW+CFG.legend*60)}else if(c.cmd==='cycle')CFG.cycle=clamp(+a||12,4,60);sendState()}
+let wsRef=null;
+function sendState(){if(!wsRef||wsRef.readyState!==1)return;wsRef.send(JSON.stringify({type:'state',game:'fish',state:'play',players:Object.values(P).filter(p=>!p.npc&&NOW-p.last<60).length,fishers:fishers.filter(F=>!F.p.npc).length,
+  catches:stats.catches,legends:stats.legends,hearts:liveHearts,legendIn:EV.st==='off'?Math.max(0,Math.round(EV.next-NOW)):0,phase:DAY.cur.n,npc:NPC.level,fps:Math.round(fpsNow),quality,live:live.state,audio:SND.ctx?SND.ctx.state:'none',mcSaid:MC.said||0}))}
+setInterval(sendState,1000);
+fetch('/record/fish').then(r=>r.json()).then(d=>{if(d.best)record.best=d.best}).catch(()=>{});
+
+// ---------- คนดูจำลอง / โหมดทดสอบ ----------
+const FAKE=['ploy_99','mek.k','nongbeam','jaa_jaa','tonkla','minnie.th','pond2002','fern.f'],FAKE2=['somchai','น้องมายด์','beer_bkk','kwankwan','aomsin','พี่ต้น'];let simT={c:1,l:0,g:12,j:3};
+function sim(){const act=Object.values(P).filter(p=>!p.npc&&NOW-p.last<25);if(NOW>simT.c){simT.c=NOW+rnd(2,5);comment(pick(FAKE),pick(['ตกปลา','ขอตัวใหญ่','555','สวัสดี','ลุ้นปลาบึก']))}
+  if(NOW>simT.j){simT.j=NOW+rnd(7,12);joined(pick(FAKE2))}if(NOW>simT.l){simT.l=NOW+0.5;if(act.length&&Math.random()<0.7)like(pick(act).name,rnd(1,6)|0)}
+  if(NOW>simT.g){simT.g=NOW+rnd(14,22);if(act.length)gift(pick(act).name,pick([1,1,5,30,30,100]))}}
+let crowdOn=Q.has('demo');
+if(Q.has('test')){const me='ผู้ทดสอบ',bar=document.createElement('div');
+  bar.style.cssText='position:fixed;left:0;right:0;bottom:0;background:rgba(14,16,20,.92);padding:8px;display:flex;flex-wrap:wrap;gap:6px;justify-content:center;font:600 15px Kanit,Tahoma;z-index:9';
+  const btn=(l,fn,bg='#3a3f48')=>{const b=document.createElement('button');b.textContent=l;b.style.cssText=`background:${bg};color:#fff;border:0;border-radius:8px;padding:8px 10px;font:inherit;cursor:pointer`;b.onclick=e=>{e.stopPropagation();SND.ctx&&SND.ctx.resume();fn()};bar.appendChild(b);return b};
+  const inp=document.createElement('input');inp.value='ตกปลา';inp.maxLength=34;inp.style.cssText='font:inherit;padding:7px 9px;border-radius:8px;border:0;width:150px';inp.onpointerdown=e=>e.stopPropagation();inp.onkeydown=e=>{e.stopPropagation();if(e.key==='Enter')comment(me,inp.value)};bar.appendChild(inp);
+  btn('พิมพ์ (ตกปลา)',()=>comment(me,inp.value),'#4a7a3a');btn('♥ x10',()=>like(me,10),'#c0394b');btn('♥ x200',()=>like(me,200),'#c0394b');
+  btn('กุหลาบ 1',()=>gift(me,1,'5655'),'#8a5a2a');btn('โดนัท 30',()=>gift(me,30,'5879'),'#8a5a2a');btn('มือหัวใจ 100',()=>gift(me,100,'5660'),'#8a5a2a');btn('คอร์กี้ 299',()=>gift(me,299,'6267'),'#8a5a2a');
+  btn('ปลาตำนานโผล่',()=>control({cmd:'legend'}),'#8a6a1a');btn('ถามวิธีเล่น',()=>comment('คนใหม่','เล่นยังไงคะ'),'#3a5a7a');btn('คนเข้าห้อง',()=>joined(pick(FAKE2)+' '+(greeted.size+1)),'#3a5a7a');
+  btn('เวลา +3 นาที',()=>{NOW+=180},'#3a5a7a');const cb=btn('คนดูจำลอง: ปิด',()=>{crowdOn=!crowdOn;cb.textContent='คนดูจำลอง: '+(crowdOn?'เปิด':'ปิด')});document.body.appendChild(bar)}
+Object.assign(window,{comment,like,gift,follow,joined,control,P,_t:s=>{NOW+=s},dbg:()=>({sounds:Object.keys(SND.buf).sort().join(' '),fishers:fishers.length,real:fishers.filter(F=>!F.p.npc).length,states:fishers.map(F=>F.st).join(','),cards:cards.length,catches:stats.catches,ev:EV.st,phase:DAY.cur.n,fps:Math.round(fpsNow),calls:renderer.info.render.calls,tris:renderer.info.render.triangles,mc:MC.said||0,audio:SND.ctx&&SND.ctx.state})});
+
+// ---------- ข้อมูลจริงจาก server.js ----------
+const ids={},used={};
+function nameFor(id,name){if(ids[id])return ids[id];let n=clean(name)?name:'ผู้ใช้',i=2;const base=n;while(used[n]&&used[n]!==id)n=`${base}${i++}`;used[n]=id;return ids[id]=n}
+function onLive(ev){if(ev.type==='status'){live={...live,...ev};return}if(ev.type==='control'){control(ev);return}const name=ev.id?nameFor(ev.id,ev.name):ev.name;
+  if(ev.type==='chat')comment(name,ev.text,ev.pic);else if(ev.type==='like')like(name,ev.count||1,ev.pic);else if(ev.type==='gift')gift(name,ev.coins||1,ev.giftId,ev.img,ev.pic,ev.gift,ev.count||1);else if(ev.type==='follow')follow(name,ev.pic,ev.repeat);else if(ev.type==='join')joined(name,ev.pic)}
+if(!DEMO){let wsT=0;const open=()=>{const ws=new WebSocket(`ws://${location.host}/ws`);wsRef=ws;ws.onmessage=m=>{try{onLive(JSON.parse(m.data))}catch(e){console.error(e)}};ws.onclose=()=>{live.state='server';clearTimeout(wsT);wsT=setTimeout(open,2000)}};open()}
+
+// ---------- loop ----------
+let last=performance.now(),errN=0,fpsN=0,fpsT0=performance.now(),quality=0,fpsNow=0,lowN=0;
+function fpsGuard(){fpsN++;const now=performance.now();if(now-fpsT0<2000)return;fpsNow=fpsN*1000/(now-fpsT0);fpsN=0;fpsT0=now;
+  if(honor||NOW<10||document.visibilityState!=='visible'){lowN=0;return}lowN=fpsNow<34?lowN+1:0;
+  if(lowN>=3&&quality<2){lowN=0;quality++;if(quality===1){renderer.setPixelRatio(0.75);composer.setPixelRatio(0.75)}else bloom.enabled=false}}
+function loop(t){requestAnimationFrame(loop);const dt=clamp((t-last)/1000,0,0.05);last=t;NOW+=dt;
+  try{if(crowdOn)sim();attract(dt);updScene(dt);musicTick();fpsGuard();updCamera(dt);renderer.info.reset();composer.render();drawOverlay()}catch(e){if(errN++<5)console.error(e)}}
+// อุ่นเครื่อง: วาดปลาทุกชนิดกับคนตกปลาหนึ่งรอบก่อนเริ่ม กันกระตุกตอนของโผล่ครั้งแรก
+function prewarm(){const tmp=[];try{FISH.forEach((f,i)=>{const m=fishMesh(f);m.position.set(-20+i*3,5,-30);scene.add(m);tmp.push(m)});const fz=makeFisher();fz.g.position.set(0,2,-20);scene.add(fz.g);tmp.push(fz.g);
+  updScene(0.016);composer.render()}catch(e){console.error('prewarm',e)}tmp.forEach(o=>scene.remove(o))}
+document.fonts.load('700 40px Kanit').finally(()=>{prewarm();last=performance.now();requestAnimationFrame(loop)});
+</script></body></html>

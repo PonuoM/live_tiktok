@@ -103,6 +103,9 @@ const server = http.createServer(async (req, res) => {
   // three.js เก็บในเครื่อง (vendor/) ไม่ต้องโหลดจากเว็บ และไม่พึ่ง importmap ที่ LIVE Studio บางรุ่นไม่รองรับ
   const vm = url.pathname.match(/^\/vendor\/three\/([\w\/.-]+\.js)$/);
   if (vm && !vm[1].includes('..')) { const f = path.join(DIR, 'vendor', 'three', vm[1]); if (fs.existsSync(f)) { res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'max-age=86400' }); return fs.createReadStream(f).pipe(res); } }
+  // ภาพปลาของเกมตกปลา (art/fish/<id>.png ตัดพื้นแล้ว)
+  const am = url.pathname.match(/^\/art\/fish\/([a-z_]+)\.png$/);
+  if (am) { const f = path.join(DIR, 'art', 'fish', am[1] + '.png'); if (fs.existsSync(f)) { res.writeHead(200, { 'content-type': 'image/png', 'cache-control': 'max-age=3600' }); return fs.createReadStream(f).pipe(res); } }
   // ปกเกมในหน้า /studio (ถ่ายจากหน้าเกมจริง ไฟล์ covers/<id>.jpg)
   const cm = url.pathname.match(/^\/covers\/([a-z]+)\.jpg$/);
   if (cm) { const f = path.join(DIR, 'covers', cm[1] + '.jpg'); if (fs.existsSync(f)) { res.writeHead(200, { 'content-type': 'image/jpeg', 'cache-control': 'no-cache' }); return fs.createReadStream(f).pipe(res); } }
@@ -209,8 +212,9 @@ function startLive() {
       if (add <= 0) return;
       const each = +(gi.diamondCount ?? gi.diamond_count) || 1;
       stat.gift++; lagOf(d);
-      rememberGift(d.giftId, gi);
-      send({ type: 'gift', ...u, gift: gi.name || gi.giftName || `gift${d.giftId}`, giftId: String(d.giftId || ''), img: giftImageUrl(gi), coins: each * add, count: add });
+      // รอเก็บไอคอนลงเครื่องก่อน (ครั้งแรกของแต่ละชิ้น รอไม่เกิน 2.5 วิ) หน้าเกมจะได้ภาพจาก /gifts/<id>.png ของเราเองเสมอ
+      const ev = { type: 'gift', ...u, gift: gi.name || gi.giftName || `gift${d.giftId}`, giftId: String(d.giftId || ''), img: giftImageUrl(gi), coins: each * add, count: add };
+      Promise.race([rememberGift(d.giftId, gi), new Promise(r => setTimeout(r, 2500))]).catch(() => {}).finally(() => send(ev));
     });
     c.on(WebcastEvent.STREAM_END, () => { if (c !== conn) return; console.log('ไลฟ์จบแล้ว'); setStatus({ state: 'offline' }); retry = setTimeout(connect, 30000); });
     c.on(ControlEvent.DISCONNECTED, () => { if (c !== conn) return;

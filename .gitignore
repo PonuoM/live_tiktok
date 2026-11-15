@@ -28,3 +28,5 @@ config.json
 settings/
 # ปกเกมในหน้า /studio ถ่ายจากหน้าเกมจริง
 !covers/*.jpg
+# ภาพปลาที่ตัดพื้นแล้ว เกมตกปลาใช้ (ภาพต้นฉบับ art/fish_raw ไม่ขึ้น git)
+!art/fish/*.png

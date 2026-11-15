@@ -9,18 +9,18 @@ const CAT = path.join(GIFT_DIR, 'catalog.json');
 fs.mkdirSync(GIFT_DIR, { recursive: true });
 let catalog = {};
 try { catalog = JSON.parse(fs.readFileSync(CAT, 'utf8')); } catch {}
-const busy = new Set();
+const busy = new Map();   // id -> งานดาวน์โหลดที่กำลังทำ (ส่งเหตุการณ์ซ้ำระหว่างโหลด รองานเดียวกัน)
 
 export function giftImageUrl(gi) {
   return gi?.image?.urlList?.[0] || gi?.icon?.urlList?.[0] || '';
 }
 
-export async function rememberGift(id, gi) {
+export function rememberGift(id, gi) {
   id = String(id || gi?.id || '');
   const url = giftImageUrl(gi);
-  if (!id || !url || catalog[id] || busy.has(id)) return catalog[id];
-  busy.add(id);
-  try {
+  if (!id || !url || catalog[id]) return Promise.resolve(catalog[id]);
+  if (busy.has(id)) return busy.get(id);
+  const job = (async () => { try {
     const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     fs.writeFileSync(path.join(GIFT_DIR, `${id}.png`), Buffer.from(await res.arrayBuffer()));
@@ -29,7 +29,9 @@ export async function rememberGift(id, gi) {
     console.log(`เก็บไอคอนของขวัญ ${gi.name} (${gi.diamondCount} เหรียญ)`);
   } catch (e) { console.log('โหลดไอคอนไม่ได้:', gi?.name, String(e.message || e).slice(0, 80)); }
   finally { busy.delete(id); }
-  return catalog[id];
+  return catalog[id]; })();
+  busy.set(id, job);
+  return job;
 }
 
 export function hasGift(id) { return !!catalog[String(id)]; }

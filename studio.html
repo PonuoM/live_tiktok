@@ -46,7 +46,7 @@ main{display:flex;flex-direction:column;min-width:0;min-height:0}
 .hero{position:relative;border-radius:var(--r);overflow:hidden;background:#000 center/cover no-repeat;border:1px solid var(--line);min-height:0;display:flex;flex-direction:column;justify-content:flex-end}
 .hero::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(13,19,26,0) 40%,rgba(13,19,26,.92) 85%)}
 .hero>div{position:relative;z-index:1;padding:16px}
-.hero h3{margin:4px 0 4px;font-size:24px}.hero p{margin:0 0 12px;color:#c9d1d9;font-size:13px}
+.hero h2{margin:4px 0 4px;font-size:24px;color:#fff}.hero p{margin:0 0 12px;color:#c9d1d9;font-size:13px}
 .badge{display:inline-block;background:var(--live);color:#fff;font-size:12px;font-weight:600;padding:2px 10px;border-radius:99px}
 .mid{display:grid;grid-template-rows:auto 1fr;gap:16px;min-height:0}
 .stat{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
@@ -64,7 +64,7 @@ main{display:flex;flex-direction:column;min-width:0;min-height:0}
 .cap .badge{position:absolute;top:8px;left:8px;z-index:1}
 .detail{display:flex;flex-direction:column;gap:10px}
 .detail .ban{aspect-ratio:16/10;border-radius:10px;background:#000 center 30%/cover no-repeat;flex:none}
-.detail h3{margin:0;font-size:24px}
+.panel.detail h2{margin:0;font-size:24px;color:#fff;font-weight:700}
 .tag{display:inline-block;font-size:12px;padding:2px 10px;border-radius:99px;background:#26364a;color:var(--dim)}
 .detail p{margin:0;color:#c9d1d9;font-size:14px}.detail .how{color:var(--gold);font-weight:600}
 /* ---------- ตั้งค่า ---------- */
@@ -105,7 +105,7 @@ ol{margin:6px 0 0;padding-left:20px;color:#c9d1d9}ol li{margin:3px 0}
   <div class="top"><h1 id="title">ไลฟ์</h1><div class="chips" id="chips"></div></div>
 
   <section class="view cur" id="v-live">
-    <div class="hero" id="hero"><div><span class="badge">เกมบนจอไลฟ์</span><h3 id="heroT"></h3><p id="heroH"></p><button data-go="lib">เปลี่ยนเกม</button></div></div>
+    <div class="hero" id="hero"><div><span class="badge">เกมบนจอไลฟ์</span><h2 id="heroT"></h2><p id="heroH"></p><button data-go="lib">เปลี่ยนเกม</button></div></div>
     <div class="mid">
       <div class="stat" id="stat"></div>
       <div class="panel"><h2>ปุ่มสั่งเกม</h2><div id="actions"></div>
@@ -160,7 +160,7 @@ async function loadGames(){const d=await fetch('/games').then(r=>r.json());G=d.g
   $('shelf').innerHTML=G.map(g=>`<div class="cap${g.id===sel?' sel':''}" data-sel="${g.id}" style="background-image:${cover(g.id)}">${g.id===active?'<span class="badge">LIVE</span>':''}<b>${esc(g.title)}</b></div>`).join('');
   renderDetail();renderHero();await loadSettings()}
 function renderDetail(){const g=game(sel),on=g.id===active;
-  $('detail').innerHTML=`<div class="ban" style="background-image:${cover(g.id)}"></div><h3>${esc(g.title)}</h3><div class="row">${on?'<span class="badge">กำลังใช้ไลฟ์</span>':''}${g.status?`<span class="tag">${esc(g.status)}</span>`:''}</div>
+  $('detail').innerHTML=`<div class="ban" style="background-image:${cover(g.id)}"></div><h2>${esc(g.title)}</h2><div class="row">${on?'<span class="badge">กำลังใช้ไลฟ์</span>':''}${g.status?`<span class="tag">${esc(g.status)}</span>`:''}</div>
     <p>${esc(g.desc)}</p><p class="how">${esc(g.how)}</p>
     <div class="row" style="margin-top:auto">${on?'<button class="play" data-go="live">ไปหน้าไลฟ์</button>':`<button class="play" data-use="${g.id}">ไลฟ์เกมนี้</button>`}
     <a class="b" href="/play/${g.id}${g.test?'?test=1':''}" target="_blank">${g.test?'ลองเล่น':'เปิดดู'}</a></div>
