@@ -24,3 +24,5 @@ followed.json
 dig-record.json
 active-game.json
 record-*.json
+config.json
+settings/

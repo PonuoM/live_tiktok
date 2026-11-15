@@ -15,9 +15,16 @@ import { handleSound } from './sound-server.js';
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
 const DEMO = args.includes('--demo');
-const USER = (args.find(a => !a.startsWith('--')) || '').replace(/^@/, '');
+// ชื่อบัญชีมาจากคำสั่ง หรือจาก config.json ที่ตั้งในหน้า /studio (ไม่ต้องพิมพ์คำสั่งเอง)
+const CONFIG_F = path.join(DIR, 'config.json');
+const readConfig = () => { try { return JSON.parse(fs.readFileSync(CONFIG_F, 'utf8')); } catch { return {}; } };
+let USER = (args.find(a => !a.startsWith('--')) || readConfig().account || '').replace(/^@/, '');
 const PORT = +(args.find(a => a.startsWith('--port='))?.slice(7)) || 4192;
-if (!USER && !DEMO) { console.log('ใช้: node server.js <ชื่อบัญชี TikTok>  หรือ  node server.js --demo'); process.exit(1); }
+if (!USER && !DEMO) console.log('ยังไม่ได้ตั้งชื่อบัญชี TikTok เปิด http://localhost:' + PORT + '/studio แล้วใส่ชื่อบัญชี');
+// ค่าตั้งของแต่ละเกม เก็บใน settings/<id>.json ค่าคือคำสั่ง control ที่ส่งให้เกมตอนเปิดหน้า
+const SET_DIR = path.join(DIR, 'settings'); fs.mkdirSync(SET_DIR, { recursive: true });
+const readSettings = id => { try { return JSON.parse(fs.readFileSync(path.join(SET_DIR, id + '.json'), 'utf8')); } catch { return {}; } };
+const readBody = async (req, max) => { let b = ''; for await (const ch of req) { b += ch; if (b.length > max) break; } return JSON.parse(b || '{}'); };
 
 // ---------- หน้าเกม + WebSocket ----------
 const server = http.createServer(async (req, res) => {
@@ -40,6 +47,20 @@ const server = http.createServer(async (req, res) => {
   if (url.pathname === "/state") {
     res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
     return res.end(JSON.stringify({ state: gameState && Date.now() - gameState.at < 5000 ? gameState : null, live: status }));
+  }
+  if (url.pathname === '/config') {
+    if (req.method === 'POST') { const acc = String((await readBody(req, 300)).account || '').trim().replace(/^@/, '');
+      if (!/^[\w.]{2,30}$/.test(acc)) { res.writeHead(400); return res.end('{}'); }
+      fs.writeFileSync(CONFIG_F, JSON.stringify({ ...readConfig(), account: acc })); if (acc !== USER) { USER = acc; console.log('เปลี่ยนบัญชีเป็น @' + acc); if (!DEMO) restartLive(); } }
+    res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }); return res.end(JSON.stringify({ account: USER, demo: DEMO }));
+  }
+  const sm = url.pathname.match(/^\/settings\/([a-z]+)$/);
+  if (sm && GAMES.some(g => g.id === sm[1])) {
+    let cur = readSettings(sm[1]);
+    if (req.method === 'POST') { const b = await readBody(req, 2000);
+      for (const [k, v] of Object.entries(b)) if (/^[a-z]+$/.test(k) && ['string', 'number', 'boolean'].includes(typeof v)) { cur[k] = v; send({ type: 'control', cmd: k, arg: v }); }
+      fs.writeFileSync(path.join(SET_DIR, sm[1] + '.json'), JSON.stringify(cur, null, 1)); }
+    res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }); return res.end(JSON.stringify(cur));
   }
   if (url.pathname === "/games") { res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" }); return res.end(JSON.stringify({ games: GAMES, active: active() })); }
   if (url.pathname === "/active") {
@@ -65,7 +86,7 @@ const server = http.createServer(async (req, res) => {
   const isLive = url.pathname === "/" || url.pathname === "/index.html";
   const gid = isLive ? active() : alias || (pm && pm[1]);
   const game = GAMES.find(g => g.id === gid);
-  const page = url.pathname === "/lib" ? "library.html" : url.pathname === "/control" ? "control.html" : game && game.file;
+  const page = url.pathname === "/lib" ? "library.html" : url.pathname === "/control" || url.pathname === "/studio" ? "studio.html" : game && game.file;
   if (page) {
     res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
     let html = fs.readFileSync(path.join(DIR, page), "utf8");
@@ -95,14 +116,16 @@ const send = ev => { const s = JSON.stringify(ev); wsss.forEach(w => w.clients.f
 let gameState = null;
 wsss.forEach(w => w.on('connection', ws => {
   ws.send(JSON.stringify(status));
-  ws.on('message', m => { try { const d = JSON.parse(String(m)); if (d.type === 'state') gameState = { ...d, at: Date.now() }; } catch {} });
+  ws.on('message', m => { try { const d = JSON.parse(String(m)); if (d.type !== 'state') return; gameState = { ...d, at: Date.now() };
+    // หน้าเกมเพิ่งเปิด (หรือเปลี่ยนเกม): ส่งค่าที่ตั้งไว้ของเกมนั้นให้ทันที
+    if (ws.game !== d.game && /^[a-z]+$/.test(String(d.game))) { ws.game = d.game; for (const [k, v] of Object.entries(readSettings(d.game))) ws.send(JSON.stringify({ type: 'control', cmd: k, arg: v })); } } catch {} });
 }));
 const setStatus = patch => { status = { ...status, ...patch }; send(status); };
-server.listen(PORT, '127.0.0.1', () => console.log(`หน้าเกม: http://localhost:${PORT}/${DEMO ? '?demo=1' : ''}   ควบคุม: http://localhost:${PORT}/control   คลังเกม: http://localhost:${PORT}/lib`));
+server.listen(PORT, '127.0.0.1', () => console.log(`หน้าเปิดไลฟ์: http://localhost:${PORT}/studio   (ลิงก์ใน LIVE Studio: http://127.0.0.1.nip.io:${PORT}/)`));
 server6.on('error', () => {}); server6.listen(PORT, '::1');
 
 if (DEMO) { console.log('โหมดจำลอง ไม่ต่อไลฟ์'); }
-else startLive();
+else if (USER) startLive();
 
 // ---------- ตัวเชื่อม TikTok ----------
 function who(u) {
@@ -141,18 +164,23 @@ setInterval(() => {
   Object.assign(stat, { chat: 0, like: 0, gift: 0, member: 0, follow: 0, lag: [] });
 }, 10000);
 
+var conn = null, retry = null, connect = null; // var เพราะ startLive ถูกเรียกก่อนบรรทัดนี้
+// เปลี่ยนบัญชีจากหน้า /studio: ปิดตัวเชื่อมเดิมแล้วต่อบัญชีใหม่
+function restartLive() { clearTimeout(retry); const old = conn; conn = null; Promise.resolve().then(() => old?.disconnect()).catch(() => {}); setStatus({ user: USER, viewers: 0 }); if (connect) connect(); else startLive(); }
 function startLive() {
-  let conn = null, retry = null;
-  const connect = async () => {
+  connect = async () => {
     clearTimeout(retry);
     setStatus({ state: 'connecting' });
-    conn = new TikTokLiveConnection(USER, { enableExtendedGiftInfo: false, processInitialData: false } /* รายชื่อของขวัญทั้งห้องต้องใช้แพ็กเกจเสียเงินของ Euler ราคามากับของขวัญแต่ละชิ้นอยู่แล้ว */);
+    setStatus({ user: USER });
+    const me = conn = new TikTokLiveConnection(USER, { enableExtendedGiftInfo: false, processInitialData: false } /* รายชื่อของขวัญทั้งห้องต้องใช้แพ็กเกจเสียเงินของ Euler ราคามากับของขวัญแต่ละชิ้นอยู่แล้ว */);
     wire(conn);
     try {
-      const st = await conn.connect();
+      const st = await me.connect();
+      if (me !== conn) return;
       console.log(`ต่อไลฟ์ @${USER} แล้ว (room ${st.roomId})`);
       setStatus({ state: 'live' });
     } catch (e) {
+      if (me !== conn) return;
       const msg = String(e?.message || e);
       const offline = /offline|isn't online|not.*live/i.test(msg + ' ' + e?.name);
       console.log(offline ? `@${USER} ยังไม่ได้ไลฟ์ ลองใหม่ใน 30 วิ` : `ต่อไม่ได้: ${msg.slice(0, 200)} ลองใหม่ใน 15 วิ`);
@@ -181,8 +209,8 @@ function startLive() {
       rememberGift(d.giftId, gi);
       send({ type: 'gift', ...u, gift: gi.name || gi.giftName || `gift${d.giftId}`, giftId: String(d.giftId || ''), img: giftImageUrl(gi), coins: each * add, count: add });
     });
-    c.on(WebcastEvent.STREAM_END, () => { console.log('ไลฟ์จบแล้ว'); setStatus({ state: 'offline' }); retry = setTimeout(connect, 30000); });
-    c.on(ControlEvent.DISCONNECTED, () => {
+    c.on(WebcastEvent.STREAM_END, () => { if (c !== conn) return; console.log('ไลฟ์จบแล้ว'); setStatus({ state: 'offline' }); retry = setTimeout(connect, 30000); });
+    c.on(ControlEvent.DISCONNECTED, () => { if (c !== conn) return;
       if (status.state === 'live') { console.log('หลุดการเชื่อมต่อ ต่อใหม่ใน 5 วิ'); setStatus({ state: 'connecting' }); retry = setTimeout(connect, 5000); }
     });
     c.on(ControlEvent.ERROR, e => console.log('error:', String(e?.info || e?.message || e).slice(0, 200)));
