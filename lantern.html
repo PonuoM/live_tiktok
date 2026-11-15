@@ -511,8 +511,8 @@ async function mcNext(){const c=SND.ctx,now=()=>performance.now()/1000;MC.q=MC.q
   if(MUS.bus)MUS.bus.gain.setTargetAtTime(MUS.vol*0.4,c.currentTime,0.1);
   if(a.chime)await mcChime();
   const buf=await Promise.race([bufP,new Promise(r=>setTimeout(()=>r(null),7000))]);
-  if(buf)await new Promise(res=>{const s=c.createBufferSource(),gn=c.createGain();s.buffer=buf;gn.gain.value=0.95;s.connect(gn).connect(mcPA());s.onended=res;s.start()});
-  MC.lastEnd=NOW;MC.said=(MC.said||0)+(buf?1:0);if(!MC.q.length&&MUS.bus)MUS.bus.gain.setTargetAtTime(MUS.vol,c.currentTime,0.6);setTimeout(mcNext,MC.q.length?250:500)}
+  if(buf)await new Promise(res=>{const s=c.createBufferSource(),gn=c.createGain();s.buffer=buf;gn.gain.value=0.95;s.connect(gn).connect(mcPA());s.onended=res;s.start();setTimeout(res,(buf.duration+2)*1000)});
+  MC.lastEnd=NOW;MC.lastOk=buf?NOW:MC.lastOk;MC.said=(MC.said||0)+(buf?1:0);if(!MC.q.length&&MUS.bus)MUS.bus.gain.setTargetAtTime(MUS.vol,c.currentTime,0.6);setTimeout(mcNext,MC.q.length?250:500)}
 // ต้อนรับคนเข้าใหม่ด้วยชื่อ (ทั้งคนที่เพิ่งเข้าห้องและคนที่เริ่มเล่น) คนละครั้ง มีแถบชื่อขึ้นบนจอด้วย ถ้าเข้ามาถี่ใช้ประโยคสั้น
 const greeted=new Set();let toasts=[];
 function welcome(name){if(PRESIM||!name||greeted.has(name)||!clean(name))return;greeted.add(name);toasts.push({name,t:NOW});if(toasts.length>4)toasts.shift();
@@ -520,7 +520,7 @@ function welcome(name){if(PRESIM||!name||greeted.has(name)||!clean(name))return;
 function firstLantern(p){if(p.skipFirst){p.skipFirst=false;greeted.add(p.name);return}const was=greeted.has(p.name);greeted.add(p.name);if(!was){toasts.push({name:p.name,t:NOW});if(toasts.length>4)toasts.shift()}
   if(MC.q.length<4)mcSay(pickLine(was?MC_FIRST.slice(0,2):MC_FIRST),{n:p.name,f:'มีโคมดวงใหม่ลอยขึ้นแล้วครับ ขอให้สมหวังนะครับ',ttl:18})}
 // ตอนไม่มีอะไรจะพูด โฆษกพูดเองทุก 12-18 วินาที
-function mcIdle(dt){MC.idleT-=dt;if(MC.idleT>0||MC.busy||MC.q.length||NOW-MC.lastEnd<4)return;MC.idleT=rnd(12,18);MC.n++;mcSay(pickLine(MC_IDLE),{chime:MC.n%4===1,ttl:10})}
+function mcIdle(dt){MC.idleT-=dt;if(SND.ctx&&SND.ctx.state==='suspended'&&(MC.rT=(MC.rT||0)-dt)<0){MC.rT=3;SND.ctx.resume().catch(()=>{})}if(MC.idleT>0||MC.busy||MC.q.length||NOW-MC.lastEnd<4)return;MC.idleT=rnd(12,18);MC.n++;mcSay(pickLine(MC_IDLE),{chime:MC.n%4===1,ttl:10})}
 sndInit();
 
 // ---------- จอ 2 มิติทับด้านบน: ป้าย ชื่อ คำอธิษฐาน ----------
@@ -597,7 +597,7 @@ function joined(name,pic){if(PRESIM||!name||!clean(name))return;if(!P[name]&&Obj
 // คำสั่งจากหน้า /control และรายงานสถานะกลับทุกวินาที
 function control(c){const a=c.arg;if(c.cmd==='npc')NPC.level=clamp(+a|0,0,2);else if(c.cmd==='fireworks')show(8,{heart:true});else if(c.cmd==='say'&&a&&clean(a))mcSay(String(a).slice(0,150),{pri:1,chime:1,ttl:60});else if(c.cmd==='reload')location.reload();sendState()}
 let wsRef=null;
-function sendState(){if(!wsRef||wsRef.readyState!==1)return;wsRef.send(JSON.stringify({type:'state',game:'lantern',state:'play',players:Object.values(P).filter(p=>(p.wishes||p.hearts)&&NOW-p.last<60).length,watching:greeted.size,lanterns:lanterns.length,hearts:liveHearts,wishes:wishesTotal,npc:NPC.level,fps:Math.round(fpsNow),quality,live:live.state}))}
+function sendState(){if(!wsRef||wsRef.readyState!==1)return;wsRef.send(JSON.stringify({type:'state',game:'lantern',state:'play',players:Object.values(P).filter(p=>(p.wishes||p.hearts)&&NOW-p.last<60).length,watching:greeted.size,lanterns:lanterns.length,hearts:liveHearts,wishes:wishesTotal,npc:NPC.level,fps:Math.round(fpsNow),quality,live:live.state,audio:SND.ctx?SND.ctx.state:'none',mcSaid:MC.said||0,mcBusy:!!MC.busy,mcQ:MC.q.length}))}
 setInterval(sendState,1000);
 
 // ---------- คนดูจำลอง / โหมดทดสอบ ----------

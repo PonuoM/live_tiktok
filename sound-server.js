@@ -33,7 +33,7 @@ async function edgeOnce(text, prosody) {
   await new Promise(res => {
     audioStream.on('data', c => parts.push(c));
     audioStream.on('end', () => { ok = true; res(); });
-    audioStream.on('error', res);
+    audioStream.on('error', e => { console.log('เสียงโฆษกขาดกลางทาง:', String(e && e.message || e).slice(0, 160)); res(); });
     setTimeout(res, 10000);
   });
   try { tts.close(); } catch {}
@@ -47,7 +47,7 @@ function synth(text, prefix = "", prosody) {
   if (busy.has(file)) return busy.get(file);
   const job = (async () => {
     for (let i = 0; i < 3; i++) {
-      const b = await edgeOnce(text, prosody).catch(() => null);
+      const b = await edgeOnce(text, prosody).catch(e => { console.log('เสียงโฆษกสร้างไม่ได้:', String(e && e.message || e).slice(0, 160)); return null; });
       if (b) { fs.writeFileSync(file, b); await normalize(file).catch(() => {}); return file; }
       await new Promise(r => setTimeout(r, 600));
     }

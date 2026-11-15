@@ -40,5 +40,17 @@
   "name": "Love in Scent",
   "coins": 5,
   "file": "919386.png"
+ },
+ "1167779": {
+  "id": "1167779",
+  "name": "Mantap",
+  "coins": 1,
+  "file": "1167779.png"
+ },
+ "1347121": {
+  "id": "1347121",
+  "name": "Mirwas Beat",
+  "coins": 1,
+  "file": "1347121.png"
  }
 }
