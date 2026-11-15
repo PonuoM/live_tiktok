@@ -62,14 +62,17 @@ export async function sayName(text) {
 }
 // ประโยคของโฆษกงานวัด: t คือประโยคที่มี {n} แทนชื่อคน ชื่อถูกแปลงเป็นอักษรไทยก่อนอ่าน ถ้าแปลงแล้วไม่เหลือชื่อให้ใช้ประโยคสำรอง f
 // พูดเร็วและเสียงสูงกว่าปกติเล็กน้อยให้คึกคักแบบโฆษก (เอฟเฟกต์ลำโพงใส่ที่หน้าเกม)
-// v = 'f' เสียงผู้หญิง (Premwadee) พูดปกติไม่เร่ง ใช้กับเกมตกปลา ให้ต่างจากโฆษกงานวัด
+// v = 'f' เสียงผู้หญิง (Premwadee) พูดปกติไม่เร่ง (เกมตกปลาเคยใช้ ตอนนี้เลิกแล้ว)
+// v = 'm' เสียงผู้ชาย (Niwat) แบบคนประกาศบ่อตกปลา พูดไม่เร่งเท่างานวัด เสียงสูงขึ้นนิดให้ดูตะโกน (เอฟเฟกต์โทรโข่งใส่ที่หน้าเกม)
 export async function sayLine(t, n, f, v) {
   const name = n ? nameToThai(n).slice(0, 24) : "";
   let text = String(t || "");
   if (text.includes("{n}")) text = name ? text.split("{n}").join(name) : String(f || "");
   text = text.replace(/\s+/g, " ").trim().slice(0, 160);
   if (text.length < 2) return null;
-  return v === 'f' ? synth(text, "mcf-", { rate: "+2%" }, 'th-TH-PremwadeeNeural') : synth(text, "mc-", { rate: "+7%", pitch: "+3%" });
+  if (v === 'f') return synth(text, "mcf-", { rate: "+2%" }, 'th-TH-PremwadeeNeural');
+  if (v === 'm') return synth(text, "mcm-", { rate: "+3%", pitch: "+5%" });
+  return synth(text, "mc-", { rate: "+7%", pitch: "+3%" });
 }
 
 export function readChoice() { try { return JSON.parse(fs.readFileSync(CHOICE, 'utf8')); } catch { return {}; } }

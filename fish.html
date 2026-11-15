@@ -317,14 +317,14 @@ function caught(F,c){const p=F.p;stats.catches++;if(c.r===3)stats.legends++;cons
   if(c.r===3&&!p.npc){cards.push({p,c,t:Math.max(NOW+0.5,...cards.map(x=>x.t+x.d)),d:6});honorOf(F)}
   afterCatchSay(p,c)}
 function afterCatchSay(p,c){if(p.npc)return;
-  if(c.r===3){sfx('flegfan',1);sfxAt('clapb',0.8,1.4,2);duck(5.5);mcSay('ปลาตำนาน! คุณ{n}ได้'+c.f.n+' หนัก '+c.kg+' กิโลค่ะ ขอเสียงปรบมือหน่อยค่ะ',{n:p.name,f:'มีคนได้ปลาตำนานแล้วค่ะ ขอเสียงปรบมือหน่อยค่ะ',pri:1,chime:1,ttl:30})}
-  else if(c.r===2){sfxAt('frare',0.95,0,0.5);sfxAt('claps',0.6,0.7,2);duck(2.5);mcSay('โอ้โห คุณ{n}ได้'+c.f.n+'ตัวใหญ่ หนัก '+c.kg+' กิโลค่ะ',{n:p.name,f:'มีคนได้ปลาหายากแล้วค่ะ',ttl:18})}
-  else{sfx('fcatch',c.r?0.7:0.45);if(p.casts===1)mcSay(pick(['คุณ{n}ได้ปลาตัวแรกแล้วค่ะ พิมพ์อีกได้เรื่อยๆ นะคะ','ยินดีด้วยค่ะคุณ{n} ตัวแรกมาแล้ว พิมพ์อีกเพื่อลุ้นตัวใหญ่ค่ะ']),{n:p.name,f:'มีคนได้ปลาตัวแรกแล้วค่ะ',ttl:15})}}
+  if(c.r===3){sfx('flegfan',1);sfxAt('clapb',0.8,1.4,2);duck(5.5);mcSay('ปลาตำนาน! คุณ{n}ได้'+c.f.n+' หนัก '+c.kg+' กิโลครับ ขอเสียงปรบมือหน่อยครับ',{n:p.name,f:'มีคนได้ปลาตำนานแล้วครับ ขอเสียงปรบมือหน่อยครับ',pri:1,chime:1,ttl:30})}
+  else if(c.r===2){sfxAt('frare',0.95,0,0.5);sfxAt('claps',0.6,0.7,2);duck(2.5);mcSay('โอ้โห คุณ{n}ได้'+c.f.n+'ตัวใหญ่ หนัก '+c.kg+' กิโลครับ',{n:p.name,f:'มีคนได้ปลาหายากแล้วครับ',ttl:18})}
+  else{sfx('fcatch',c.r?0.7:0.45);if(p.casts===1)mcSay(pick(['คุณ{n}ได้ปลาตัวแรกแล้วครับ พิมพ์อีกได้เรื่อยๆ นะครับ','ยินดีด้วยครับคุณ{n} ตัวแรกมาแล้ว พิมพ์อีกเพื่อลุ้นตัวใหญ่ครับ']),{n:p.name,f:'มีคนได้ปลาตัวแรกแล้วครับ',ttl:15})}}
 function banner(s,col,sub=''){banners.push({s,col,sub,t:Math.max(NOW,...banners.map(b=>b.t+2.6))})}
 
 // ---------- ปลาตำนานโผล่ (ทุก CFG.legend นาที): ใครพิมพ์ในช่วงนับถอยหลังได้ลุ้น ----------
 const EV={next:90,st:'off',t:0,who:new Map(),win:null};
-function legendStart(){if(EV.st!=='off')return;EV.st='warn';EV.t=NOW;EV.who=new Map();sfx('flegend',0.9);mcSay('ปลาตำนานโผล่แล้วค่ะ! พิมพ์อะไรก็ได้ภายในสิบห้าวินาที เพื่อลุ้นตกปลาตำนานค่ะ',{pri:1,chime:1,ttl:20})}
+function legendStart(){if(EV.st!=='off')return;EV.st='warn';EV.t=NOW;EV.who=new Map();sfx('flegend',0.9);mcSay('ปลาตำนานโผล่แล้วครับ! พิมพ์อะไรก็ได้ภายในสิบห้าวินาที เพื่อลุ้นตกปลาตำนานครับ',{pri:1,chime:1,ttl:20})}
 function legendTick(){if(EV.st==='off'){if(NOW>EV.next&&(realActive()||Q.has('test')))legendStart();return}
   const k=NOW-EV.t;lake.uniforms.glow.value=EV.st==='open'||EV.st==='warn'?clamp(k/2,0,1):Math.max(0,lake.uniforms.glow.value-0.01);
   if(EV.st==='warn'&&k>2.5){EV.st='open';EV.t=NOW}
@@ -338,14 +338,14 @@ function updLegShadow(){const on=EV.st==='warn'||EV.st==='open',m=legShadow.sh.m
 // หัวใจรวมครบเป้า = ปลาขึ้นฝูง 30 วิ: กินเบ็ดเร็ว ปลาทองกระโดดทั่วบึง
 let liveHearts=0,msIdx=0,frenzyUntil=0;const MS_G=i=>[200,500,1000,1800,3000][i]??3000+(i-4)*1500;
 const frenzyOn=()=>NOW<frenzyUntil;
-function frenzy(sec=30){frenzyUntil=Math.max(frenzyUntil,NOW)+sec;banner('ปลาขึ้นฝูง!','#ffd04a','30 วินาที ปลากินเบ็ดเร็ว พิมพ์รัวๆ เลย');sfx('win',0.7);mcSay('ปลาขึ้นฝูงแล้วค่ะ! สามสิบวินาทีนี้ปลากินเบ็ดไวมาก พิมพ์รัวๆ ได้เลยค่ะ',{pri:1,chime:1,ttl:20})}
+function frenzy(sec=30){frenzyUntil=Math.max(frenzyUntil,NOW)+sec;banner('ปลาขึ้นฝูง!','#ffd04a','30 วินาที ปลากินเบ็ดเร็ว พิมพ์รัวๆ เลย');sfx('win',0.7);mcSay('ปลาขึ้นฝูงแล้วครับ! สามสิบวินาทีนี้ปลากินเบ็ดไวมาก พิมพ์รัวๆ ได้เลยครับ',{pri:1,chime:1,ttl:20})}
 
 // หัวใจครบเป้า: จอมืดลง หัวใจยักษ์เต้นกลางจอ ฝนหัวใจ ปลาคาร์ปจันทรายักษ์กระโดดข้ามท่า บึงเรืองแสงชมพู
 // ทุกคนบนท่าได้เหยื่อพิเศษเบ็ดถัดไป แล้วเข้าช่วงปลาขึ้นฝูง
 const HS={t:-99,goal:0,koi:null};let heartRain=[];
 function heartGoal(goal){HS.t=NOW;HS.goal=goal;for(let i=0;i<90;i++)heartRain.push({x:rnd(0,W),y:H+rnd(0,600),vy:rnd(300,620),s:rnd(18,44),sw:rnd(0,6),c:pick(['#ff5a7a','#ff8aa8','#ffb0c8','#ff3a6a','#ffd0e0']),t:NOW});
   for(const F of fishers)if(!F.p.npc)F.min=Math.max(F.min||0,1);sfx('hgoal',1);sfxAt('clapb',0.85,0.9,2);duck(5.5);
-  mcSay('หัวใจครบ '+goal+' ดวงแล้วค่ะ! ขอบคุณทุกคนมากๆ เลยนะคะ ทุกคนบนท่าได้เหยื่อพิเศษ แล้วปลากำลังจะขึ้นฝูงค่ะ',{pri:1,chime:1,ttl:25});
+  mcSay('หัวใจครบ '+goal+' ดวงแล้วครับ! ขอบคุณทุกคนมากๆ เลยนะครับ ทุกคนบนท่าได้เหยื่อพิเศษ แล้วปลากำลังจะขึ้นฝูงครับ',{pri:1,chime:1,ttl:25});
   const f=FISH.find(x=>x.n==='ปลาคาร์ปจันทรา'),m=fishMesh(f,false);fishSize(m,16);m.material.color.setRGB(1,0.85,0.95);scene.add(m);HS.koi=m;setTimeout(()=>frenzy(),5200)}
 function updHeartShow(dt){const k=NOW-HS.t;if(k<5)lake.uniforms.glow.value=Math.max(lake.uniforms.glow.value,Math.sin(clamp(k/5,0,1)*Math.PI)*0.9);else if(EV.st==='off')lake.uniforms.glow.value=Math.max(0,lake.uniforms.glow.value-0.01);
   if(HS.koi){const u=clamp((k-0.8)/3.2,0,1);HS.koi.position.set(lerp(-60,60,u),PIER.y+2+Math.sin(u*Math.PI)*26,-6);HS.koi.material.rotation=lerp(0.6,-0.6,u);
@@ -363,7 +363,7 @@ function drawHeartFx(){heartFx=heartFx.filter(h=>NOW-h.t<1.4&&fishers.includes(h
 let lastReal=-99;
 function comment(name,text,pic){const p=player(name,pic);lastReal=NOW;const t=String(text||'').replace(/\s+/g,' ').trim();
   if(EV.st==='open'||EV.st==='warn')EV.who.set(p,(EV.who.get(p)||0)+1+Math.min(4,(p.hearts-(p.evH??p.hearts))/20));
-  if(HELP.test(t)&&NOW-(helpT||-99)>12){helpT=NOW;helpShow=NOW;mcSay('พิมพ์อะไรก็ได้ในแชทค่ะ ตัวละครชื่อคุณจะนั่งตกปลาให้ทันที กดหัวใจปลาจะกินเบ็ดเร็วขึ้นค่ะ',{pri:1,ttl:20})}
+  if(HELP.test(t)&&NOW-(helpT||-99)>12){helpT=NOW;helpShow=NOW;mcSay('พิมพ์อะไรก็ได้ในแชทครับ ตัวละครชื่อคุณจะนั่งตกปลาให้ทันที กดหัวใจปลาจะกินเบ็ดเร็วขึ้นครับ',{pri:1,ttl:20})}
   if(t&&clean(t)&&t.length>=1)bubbles.push({p,s:t,t:NOW});const first=!p.F,firstEver=!p.casts;if(cast(p)&&firstEver)p.firstCard=true;if(first)welcomeFirst(p)}
 let helpT=-99,helpShow=-99;
 let heartFx=[];
@@ -395,10 +395,10 @@ function gift(name,coins,giftId,img,pic,gname,cnt=1){const p=player(name,pic);p.
   else{const wait=thanks.filter(x=>x.t>NOW).length,d=coins>=299?6:coins>=100?4.8:wait>2?1.6:coins>=10?3.4:2.6;thanks.push({p,gn,icon,count:cnt,coins,at:NOW,t:Math.max(NOW,...thanks.map(x=>x.t+x.d)),d})}
   crown(p);giftBurst(p,coins);if(coins>=100)coinBurst(coins>=299?140:80);if(coins>=10){confettiBurst(coins>=100?170:80);if(p.F)honorOf(p.F,coins>=100?6.5:3.2)}
   if(NOW-(p.thankT||-99)>6){p.thankT=NOW;const big=coins>=100,mid=coins>=10;
-    mcSay(big?pick(['ขอเสียงปรบมือดังๆ ให้คุณ{n}ด้วยค่ะ ขอบคุณมากๆ เลยนะคะ เบ็ดนี้ได้ปลาตำนานแน่นอนค่ะ','ว้าว ขอบคุณคุณ{n}มากเลยค่ะ ใจดีสุดๆ ปลาตำนานรออยู่แล้วค่ะ'])
-      :mid?pick(['ขอบคุณคุณ{n}มากเลยค่ะ ได้มงกุฎทองไปเลยนะคะ','ขอบคุณคุณ{n}ค่ะ น่ารักมากเลย เบ็ดนี้ได้ปลาดีแน่นอนค่ะ'])
-      :pick(['ขอบคุณคุณ{n}สำหรับของขวัญนะคะ','ขอบคุณคุณ{n}มากเลยค่ะ ได้มงกุฎไปเลยนะคะ','คุณ{n}ส่งของขวัญมาค่ะ ขอบคุณมากนะคะ']),
-      {n:name,f:'ขอบคุณสำหรับของขวัญมากเลยค่ะ',pri:1,ttl:25})}}
+    mcSay(big?pick(['ขอเสียงปรบมือดังๆ ให้คุณ{n}ด้วยครับ ขอบคุณมากๆ เลยนะครับ เบ็ดนี้ได้ปลาตำนานแน่นอนครับ','ว้าว ขอบคุณคุณ{n}มากเลยครับ ใจดีสุดๆ ปลาตำนานรออยู่แล้วครับ'])
+      :mid?pick(['ขอบคุณคุณ{n}มากเลยครับ ได้มงกุฎทองไปเลยนะครับ','ขอบคุณคุณ{n}ครับ น่ารักมากเลย เบ็ดนี้ได้ปลาดีแน่นอนครับ'])
+      :pick(['ขอบคุณคุณ{n}สำหรับของขวัญนะครับ','ขอบคุณคุณ{n}มากเลยครับ ได้มงกุฎไปเลยนะครับ','คุณ{n}ส่งของขวัญมาครับ ขอบคุณมากนะครับ']),
+      {n:name,f:'ขอบคุณสำหรับของขวัญมากเลยครับ',pri:1,ttl:25})}}
 // ประกายทองพุ่งจากตัวละคร (สามมิติ)
 function giftBurst(p,coins){const F=p.F;if(!F)return;F.g.getWorldPosition(TMP);const n=coins>=100?44:coins>=10?28:16;
   for(let i=0;i<n;i++){const sp=glowSprite(pick([0xffd060,0xfff0b0,0xffa040]),rnd(0.5,1.1),1);sp.position.set(TMP.x,TMP.y+3,TMP.z);sp.layers.set(1);scene.add(sp);
@@ -408,7 +408,7 @@ function updSparks3(dt){for(const o of sparks3){o.vy-=14*dt;o.sp.position.x+=o.v
 // พลุกระดาษบนจอ (สองมิติ)
 function confettiBurst(n){for(let i=0;i<n;i++)confetti.push({x:rnd(0,W),y:rnd(-200,-10),vx:rnd(-80,80),vy:rnd(250,520),r:rnd(0,6),vr:rnd(-8,8),c:pick(['#ffd04a','#ff6a8a','#7fd8ff','#9fe08a','#ffffff','#c080ff']),w:rnd(10,18),t:NOW})}
 const followDone=new Set();
-function follow(name,pic,repeat){const p=player(name,pic);if(repeat||followDone.has(name))return;followDone.add(name);cast(p,{force:1});mcSay('ขอบคุณคุณ{n}ที่กดติดตามค่ะ เบ็ดนี้ได้ปลาไม่ธรรมดาค่ะ',{n:name,f:'ขอบคุณที่กดติดตามค่ะ',pri:1,ttl:25});banner(`ขอบคุณ ${short(name,12)} ที่กดติดตาม`,'#f0c86a','รับเหยื่อพิเศษ 1 เบ็ด')}
+function follow(name,pic,repeat){const p=player(name,pic);if(repeat||followDone.has(name))return;followDone.add(name);cast(p,{force:1});mcSay('ขอบคุณคุณ{n}ที่กดติดตามครับ เบ็ดนี้ได้ปลาไม่ธรรมดาครับ',{n:name,f:'ขอบคุณที่กดติดตามครับ',pri:1,ttl:25});banner(`ขอบคุณ ${short(name,12)} ที่กดติดตาม`,'#f0c86a','รับเหยื่อพิเศษ 1 เบ็ด')}
 
 // ---------- เสียง ----------
 const SND={ctx:null,buf:{},last:{}};let voices=0,PRESIM=false;
@@ -441,33 +441,43 @@ function musicTick(){const c=SND.ctx,b=SND.buf.bgm_fish;if(!c||c.state!=='runnin
   src.connect(gn).connect(MUS.bus);src.start(now);MUS.next=now+b.duration-X}
 // ---------- โฆษกท่าน้ำ (เสียงเดียวกับโคม สร้างที่ server /mc) ----------
 const MC={q:[],busy:false,lastEnd:-99,idleT:8,recent:[],pa:null,n:0};
-const MC_IDLE=['พิมพ์อะไรก็ได้ในแชทค่ะ ตัวละครชื่อคุณจะนั่งตกปลาให้ทันที','ใครยังไม่ได้ตก พิมพ์มาสักคำค่ะ จะพิมพ์ว่าตกปลา หรือพิมพ์ชื่อตัวเองก็ได้',
-  'กดหัวใจรัวๆ ปลาจะกินเบ็ดเร็วขึ้นนะคะ','พิมพ์ได้เรื่อยๆ นะคะ พิมพ์หนึ่งครั้งได้เหวี่ยงเบ็ดหนึ่งครั้ง ลุ้นตัวใหญ่กว่าเดิม','ปลาที่ตกได้อยู่ในถังน้ำข้างตัวนะคะ ลุกจากท่าเมื่อไหร่ เราปล่อยคืนบึงทุกตัวค่ะ',
-  'ใครได้ปลาตัวใหญ่สุด ขึ้นกระดานด้านซ้ายมือเลยค่ะ','หัวใจรวมครบเป้าเมื่อไหร่ ปลาจะขึ้นฝูง กินเบ็ดไวมากค่ะ','อีกไม่นานปลาตำนานจะโผล่ ตอนนั้นใครพิมพ์ทันได้ลุ้นค่ะ',
-  'ชอบบรรยากาศริมบึงแบบนี้ กดติดตามไว้ได้เลยนะคะ จะได้ไม่พลาดไลฟ์หน้า','ขอบคุณทุกคนที่แวะมานั่งตกปลาด้วยกันนะคะ','ลมเย็นสบาย น้ำนิ่ง วันนี้ปลาน่าจะกินเบ็ดดีค่ะ'];
-const MC_WELCOME=['ยินดีต้อนรับคุณ{n}ค่ะ พิมพ์อะไรก็ได้เพื่อตกปลาเลยค่ะ','สวัสดีค่ะคุณ{n} พิมพ์มาสักคำ แล้วมานั่งตกปลาด้วยกันค่ะ','คุณ{n}มาแล้วค่ะ พิมพ์อะไรก็ได้ในแชท เพื่อเริ่มตกปลาค่ะ'];
-const MC_SEAT=['คุณ{n}นั่งลงที่ท่าน้ำแล้วค่ะ รอลุ้นปลากันเลย','คุณ{n}เหวี่ยงเบ็ดแล้วค่ะ ขอให้ได้ตัวใหญ่นะคะ'];
+const MC_IDLE=['พิมพ์อะไรก็ได้ในแชทครับ ตัวละครชื่อคุณจะนั่งตกปลาให้ทันที','ใครยังไม่ได้ตก พิมพ์มาสักคำครับ จะพิมพ์ว่าตกปลา หรือพิมพ์ชื่อตัวเองก็ได้',
+  'กดหัวใจรัวๆ ปลาจะกินเบ็ดเร็วขึ้นนะครับ','พิมพ์ได้เรื่อยๆ นะครับ พิมพ์หนึ่งครั้งได้เหวี่ยงเบ็ดหนึ่งครั้ง ลุ้นตัวใหญ่กว่าเดิม','ปลาที่ตกได้อยู่ในถังน้ำข้างตัวนะครับ ลุกจากท่าเมื่อไหร่ เราปล่อยคืนบึงทุกตัวครับ',
+  'ใครได้ปลาตัวใหญ่สุด ขึ้นกระดานด้านซ้ายมือเลยครับ','หัวใจรวมครบเป้าเมื่อไหร่ ปลาจะขึ้นฝูง กินเบ็ดไวมากครับ','อีกไม่นานปลาตำนานจะโผล่ ตอนนั้นใครพิมพ์ทันได้ลุ้นครับ',
+  'ชอบบรรยากาศริมบึงแบบนี้ กดติดตามไว้ได้เลยนะครับ จะได้ไม่พลาดไลฟ์หน้า','ขอบคุณทุกคนที่แวะมานั่งตกปลาด้วยกันนะครับ','ลมเย็นสบาย น้ำนิ่ง วันนี้ปลาน่าจะกินเบ็ดดีครับ'];
+const MC_WELCOME=['ยินดีต้อนรับคุณ{n}ครับ พิมพ์อะไรก็ได้เพื่อตกปลาเลยครับ','สวัสดีครับคุณ{n} พิมพ์มาสักคำ แล้วมานั่งตกปลาด้วยกันครับ','คุณ{n}มาแล้วครับ พิมพ์อะไรก็ได้ในแชท เพื่อเริ่มตกปลาครับ'];
+const MC_SEAT=['คุณ{n}นั่งลงที่ท่าน้ำแล้วครับ รอลุ้นปลากันเลย','คุณ{n}เหวี่ยงเบ็ดแล้วครับ ขอให้ได้ตัวใหญ่นะครับ'];
 function pickLine(list){let t;for(let i=0;i<8;i++){t=pick(list);if(!MC.recent.includes(t))break}MC.recent.push(t);if(MC.recent.length>7)MC.recent.shift();return t}
-// เสียงพูดสะอาด อุ่นขึ้นเล็กน้อย มีห้องก้องบางๆ เหมือนนั่งคุยริมน้ำ (ต่างจากโคมที่เป็นลำโพงฮอร์นงานวัด)
-function mcPA(){const c=SND.ctx;if(MC.pa)return MC.pa;const inp=c.createGain(),warm=c.createBiquadFilter(),air=c.createBiquadFilter(),dl=c.createDelay(1),fb=c.createGain(),wet=c.createGain(),lp=c.createBiquadFilter();
-  warm.type='lowshelf';warm.frequency.value=250;warm.gain.value=2;air.type='highshelf';air.frequency.value=6000;air.gain.value=2;
-  dl.delayTime.value=0.09;fb.gain.value=0.18;wet.gain.value=0.1;lp.type='lowpass';lp.frequency.value=2500;
-  inp.connect(warm).connect(air);air.connect(SND.master);air.connect(dl);dl.connect(lp).connect(fb).connect(dl);lp.connect(wet).connect(SND.master);return MC.pa=inp}
-function mcChime(){const c=SND.ctx,t0=c.currentTime;[[659,0],[988,0.16]].forEach(([f,d])=>{for(const [m,v] of [[1,0.35],[4,0.06]]){const o=c.createOscillator(),gn=c.createGain();o.type='sine';o.frequency.value=f*m;gn.gain.setValueAtTime(0.0001,t0+d);gn.gain.exponentialRampToValueAtTime(v,t0+d+0.01);gn.gain.exponentialRampToValueAtTime(0.0001,t0+d+0.6);o.connect(gn).connect(mcPA());o.start(t0+d);o.stop(t0+d+0.65)}});return new Promise(r=>setTimeout(r,650))}
+// เสียงคนประกาศบ่อตกปลาพูดผ่านโทรโข่ง: ช่วงเสียงแคบกว่าลำโพงงานวัดมาก (ตัดทุ้มตัดแหลมแบบชัน) ขึ้นจมูกที่ย่านกลาง
+// ปากแตรสั่นเพิ่มอีกย่าน แตกพร่าแรงกว่า และไม่ก้องแบบลานงาน มีแค่เสียงสะท้อนจางๆ ข้ามบึงที่โล่ง
+function mcPA(){const c=SND.ctx;if(MC.pa)return MC.pa;const inp=c.createGain(),bq=(type,f,q,g)=>{const b=c.createBiquadFilter();b.type=type;b.frequency.value=f;b.Q.value=q;if(g!=null)b.gain.value=g;return b};
+  const hp1=bq('highpass',620,0.8),hp2=bq('highpass',620,0.8),lp1=bq('lowpass',3100,0.8),lp2=bq('lowpass',3100,0.8),horn=bq('peaking',1350,2.2,9),cone=bq('peaking',2500,3,4);
+  const drive=c.createGain(),ws=c.createWaveShaper(),out=c.createGain(),dl=c.createDelay(1),dlp=bq('lowpass',1600,0.7),fb=c.createGain(),wet=c.createGain();
+  const cv=new Float32Array(1024);for(let i=0;i<1024;i++){const x=i/512-1;cv[i]=Math.tanh(x*4)/Math.tanh(4)}ws.curve=cv;ws.oversample='2x';
+  drive.gain.value=1.8;out.gain.value=0.72;dl.delayTime.value=0.36;fb.gain.value=0.1;wet.gain.value=0.13;
+  inp.connect(hp1).connect(hp2).connect(horn).connect(cone).connect(drive).connect(ws).connect(lp1).connect(lp2).connect(out);
+  out.connect(SND.master);out.connect(dl);dl.connect(dlp);dlp.connect(fb).connect(dl);dlp.connect(wet).connect(SND.master);return MC.pa=inp}
+// เสียงคลิกตอนกดไกโทรโข่งก่อนพูดทุกประโยค
+function mcClick(){const c=SND.ctx,t0=c.currentTime,s=c.createBufferSource(),gn=c.createGain();s.buffer=SND.noise;gn.gain.setValueAtTime(0.5,t0);gn.gain.exponentialRampToValueAtTime(0.0001,t0+0.035);s.connect(gn).connect(mcPA());s.start(t0);s.stop(t0+0.04)}
+// ประกาศสำคัญเปิดด้วยเสียงหวอสั้นๆ จากปุ่มไซเรนของโทรโข่ง (เสียงขึ้นสองรอบ)
+function mcChime(){const c=SND.ctx,t0=c.currentTime,o=c.createOscillator(),gn=c.createGain();o.type='square';
+  o.frequency.setValueAtTime(650,t0);o.frequency.linearRampToValueAtTime(1150,t0+0.28);o.frequency.setValueAtTime(650,t0+0.3);o.frequency.linearRampToValueAtTime(1150,t0+0.58);
+  gn.gain.setValueAtTime(0.0001,t0);gn.gain.exponentialRampToValueAtTime(0.16,t0+0.03);gn.gain.setValueAtTime(0.16,t0+0.52);gn.gain.exponentialRampToValueAtTime(0.0001,t0+0.66);
+  o.connect(gn).connect(mcPA());o.start(t0);o.stop(t0+0.7);return new Promise(r=>setTimeout(r,800))}
 function mcSay(t,o={}){if(PRESIM||(!CFG.mc&&!o.pri))return;if(o.n!=null&&!clean(o.n))return;const q=MC.q;if(q.length>=10){const i=q.findIndex(x=>!x.pri);if(i<0)return;q.splice(i,1)}
   const it={t,n:o.n,f:o.f,pri:o.pri||0,chime:o.chime,w:o.w,at:performance.now()/1000,ttl:o.ttl||30};if(it.pri){const i=q.findIndex(x=>!x.pri);q.splice(i<0?q.length:i,0,it)}else q.push(it);if(!MC.busy)mcNext()}
 async function mcNext(){const c=SND.ctx,now=()=>performance.now()/1000;MC.q=MC.q.filter(x=>now()-x.at<x.ttl);const a=MC.q.shift();if(!a){MC.busy=false;return}
   if(!c||c.state!=='running'){MC.busy=false;MC.q.length=0;return}MC.busy=true;
-  const url='/mc?v=f&t='+encodeURIComponent(a.t)+(a.n!=null?'&n='+encodeURIComponent(a.n):'')+(a.f?'&f='+encodeURIComponent(a.f):'');
+  const url='/mc?v=m&t='+encodeURIComponent(a.t)+(a.n!=null?'&n='+encodeURIComponent(a.n):'')+(a.f?'&f='+encodeURIComponent(a.f):'');
   const bufP=fetch(url,{cache:'no-cache'}).then(r=>r.ok?r.arrayBuffer():null).then(b=>b?c.decodeAudioData(b):null).catch(()=>null);
   if(MUS.bus)MUS.bus.gain.setTargetAtTime(MUS.vol*0.4,c.currentTime,0.1);if(a.chime)await mcChime();
   const buf=await Promise.race([bufP,new Promise(r=>setTimeout(()=>r(null),7000))]);
-  if(buf)await new Promise(res=>{const s=c.createBufferSource(),gn=c.createGain();s.buffer=buf;gn.gain.value=0.95;s.connect(gn).connect(mcPA());s.onended=res;s.start();setTimeout(res,(buf.duration+2)*1000)});
+  if(buf)await new Promise(res=>{const s=c.createBufferSource(),gn=c.createGain();s.buffer=buf;gn.gain.value=0.95;s.connect(gn).connect(mcPA());s.onended=res;mcClick();s.start(c.currentTime+0.06);setTimeout(res,(buf.duration+2)*1000)});
   MC.lastEnd=NOW;MC.said=(MC.said||0)+(buf?1:0);if(!MC.q.length&&MUS.bus)MUS.bus.gain.setTargetAtTime(MUS.vol,c.currentTime,0.6);setTimeout(mcNext,MC.q.length?250:500)}
 const greeted=new Set();
 function welcome(name){if(PRESIM||!name||greeted.has(name)||!clean(name))return;greeted.add(name);toasts.push({s:'ยินดีต้อนรับ '+short(name,12),t:NOW});
-  if(CFG.welcome)mcSay(MC.q.filter(x=>x.w).length>=2?'ยินดีต้อนรับคุณ{n}ค่ะ':pickLine(MC_WELCOME),{n:name,f:'ยินดีต้อนรับผู้ชมท่านใหม่ค่ะ พิมพ์อะไรก็ได้เพื่อตกปลาค่ะ',ttl:25,w:1})}
-function welcomeFirst(p){if(p.npc)return;const was=greeted.has(p.name);greeted.add(p.name);if(MC.q.length<4)mcSay(pickLine(was?MC_SEAT:MC_SEAT),{n:p.name,f:'มีคนมานั่งตกปลาเพิ่มแล้วค่ะ',ttl:15})}
+  if(CFG.welcome)mcSay(MC.q.filter(x=>x.w).length>=2?'ยินดีต้อนรับคุณ{n}ครับ':pickLine(MC_WELCOME),{n:name,f:'ยินดีต้อนรับผู้ชมท่านใหม่ครับ พิมพ์อะไรก็ได้เพื่อตกปลาครับ',ttl:25,w:1})}
+function welcomeFirst(p){if(p.npc)return;const was=greeted.has(p.name);greeted.add(p.name);if(MC.q.length<4)mcSay(pickLine(was?MC_SEAT:MC_SEAT),{n:p.name,f:'มีคนมานั่งตกปลาเพิ่มแล้วครับ',ttl:15})}
 function mcIdle(dt){MC.idleT-=dt;if(SND.ctx&&SND.ctx.state==='suspended'&&(MC.rT=(MC.rT||0)-dt)<0){MC.rT=3;SND.ctx.resume().catch(()=>{})}if(MC.idleT>0||MC.busy||MC.q.length||NOW-MC.lastEnd<4)return;MC.idleT=rnd(CFG.gap*0.8,CFG.gap*1.2);MC.n++;mcSay(pickLine(MC_IDLE),{chime:MC.n%4===1,ttl:10})}
 sndInit();
 
